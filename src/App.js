@@ -1,34 +1,43 @@
-import './App.css';
-import { useState, useRef } from 'react';
+import { CircleOutlined, CropPortrait, Download, ExpandMore, Preview } from '@mui/icons-material';
 import {
-  TextField,
-  Typography,
-  Box,
-  CssBaseline,
+  Accordion,
+  AccordionDetails,
+  AccordionSummary,
   AppBar,
-  Toolbar,
-  Drawer,
+  Box,
   Button,
+  CssBaseline,
   Dialog,
-  DialogTitle,
+  DialogActions,
   DialogContent,
   DialogContentText,
-  DialogActions,
+  DialogTitle,
+  Drawer,
   FormControlLabel,
-  Switch
+  Grid2 as Grid,
+  InputAdornment,
+  MenuItem,
+  Switch,
+  TextField,
+  ToggleButton,
+  ToggleButtonGroup,
+  Toolbar,
+  Typography
 } from '@mui/material';
 import { createTheme, ThemeProvider } from '@mui/material/styles';
-import { STLExporter } from 'three-stdlib';
 import ModelPreview from 'ModelPreview';
+import { useRef, useState } from 'react';
+import { STLExporter } from 'three-stdlib';
+import './App.css';
 
 function App() {
-  const drawerWidth = 250;
+  const drawerWidth = 400;
 
   const [modelConfig, setModelConfig] = useState({
     inlay: {
       length: 121.9,
       width: 79.9,
-      cornerRadius: 1.6,
+      cornerRadius: 3.2,
       depth: 3,
       margin: 1,
       clearance: 0.25
@@ -39,7 +48,6 @@ function App() {
       clearance: 0.5
     }
   })
-  //const { inlay, base } = modelConfig;
 
   const handleModelConfigChange = (section, field, value) => {
     setModelConfig((prevConfig) => ({
@@ -63,6 +71,95 @@ function App() {
     }));
   };
 
+  const labels = {
+    modelConfig: {
+      inlay: {
+        length: {
+          label: "Length",
+          help: "Length of the inner side of your container"
+        },
+        width: {
+          label: "Width",
+          help: "Width of the inner side of your container"
+        },
+        cornerRadius: {
+          label: "Corner Radius",
+          help: "Radius of the inlay's rounded corners"
+        },
+        depth: {
+          label: "Depth",
+          help: "Extrusion depth of the inlay, giving it height"
+        },
+        margin: {
+          label: "Margin",
+          help: "Minimum amount of space between holes and the inlay's edge"
+        },
+        clearance: {
+          label: "Printing Clearance",
+          help: "To allow the inlay to snugly fit into your container"
+        }
+      },
+      base: {
+        size: {
+          label: "Size",
+          help: "Diameter of your miniature bases"
+        },
+        spacing: {
+          label: "Spacing",
+          help: "Minimum amount of space between each base hole"
+        },
+        clearance: {
+          label: "Printing Clearance",
+          help: "To allow miniature bases to easily fit into the base holes"
+        }
+      }
+    }
+  }
+
+  // Configuration Modes
+
+  const [inlayMode, setInlayMode] = useState("gridfinity");
+  const [baseMode, setBaseMode] = useState("40k");
+
+  // TODO: Don't hardcode these, every Gridfinity bin is unfortunately different
+  const gridfinityUnit = 42;
+  const gridfinitySpacer = 0.5;
+  const gridfinityWallThickness = 1.8;
+  const gridfinityDimensionOptions = [
+    1, 2, 3, 4, 5, 6, 7, 8
+  ].map(n => [(n * gridfinityUnit) - gridfinitySpacer - (2 * gridfinityWallThickness), n])
+
+  const selectItems = {
+    "gridfinity": {
+      length: {
+        options: gridfinityDimensionOptions,
+        unit: "u",
+        help: "Length of your Gridfinity bin"
+      },
+      width: {
+        options: gridfinityDimensionOptions,
+        unit: "u",
+        help: "Width of your Gridfinity bin"
+      }
+    },
+    "40k": {
+      size: {
+        options: [
+          [25, "25"],
+          [28, "28"],
+          [32, "32"],
+          [40, "40"]
+        ],
+        unit: "mm"
+      }
+    },
+  }
+
+  const isSelectItem = (mode, key) => selectItems[mode] && selectItems[mode][key] !== undefined
+
+  const isGridfinityMode = inlayMode === "gridfinity";
+  const is40kMode = baseMode === "40k";
+
   // State variable for controlling the modal alert
   const [openAlert, setOpenAlert] = useState(false);
 
@@ -80,6 +177,7 @@ function App() {
     }
 
     // Ensure the mesh's world matrix is up-to-date
+    // @ts-ignore
     mesh.updateMatrixWorld(true);
 
     const stlBinary = exporter.parse(mesh, { binary: true });
@@ -105,7 +203,7 @@ function App() {
             <Typography variant="h5" noWrap component="div" style={{ flexGrow: 1 }}>
               Miniature Storage Inlay Generator
             </Typography>
-            <Button variant='outlined' color="inherit" onClick={handleExport}>
+            <Button variant='outlined' color="inherit" startIcon={<Download />} onClick={handleExport}>
               Download STL
             </Button>
           </Toolbar>
@@ -116,81 +214,136 @@ function App() {
           sx={{
             width: drawerWidth,
             flexShrink: 0,
-            [`& .MuiDrawer-paper`]: { width: drawerWidth, boxSizing: 'border-box' },
+            [`& .MuiDrawer-paper`]: {
+              width: drawerWidth,
+              boxSizing: 'border-box',
+              overflowX: 'hidden'
+            },
           }}
         >
           <Toolbar />
           <Box
             sx={{ width: drawerWidth, padding: 2, backgroundColor: 'background.default' }}
           >
-            <Typography variant="h6" gutterBottom>
-              Inlay Properties
-            </Typography>
+            <Accordion defaultExpanded>
+              <AccordionSummary expandIcon={<ExpandMore />}>
+                <CropPortrait sx={{ marginRight: 0.5 }} /><span>Inlay</span>
+              </AccordionSummary>
+              <AccordionDetails>
+                <ToggleButtonGroup exclusive value={inlayMode} fullWidth onChange={(e, value) => setInlayMode(value)}>
+                  <ToggleButton value="gridfinity">Gridfinity</ToggleButton>
+                  <ToggleButton value="custom">Custom</ToggleButton>
+                </ToggleButtonGroup>
 
-            {Object.entries(modelConfig.inlay).map(([key, value]) =>
-            (
-              <Box sx={{ marginBottom: 0 }} key={`box-inlay-${key}`}>
-                <TextField
-                  label={key}
-                  type="number"
-                  value={value}
-                  onChange={(e) => handleModelConfigChange('inlay', key, parseFloat(e.target.value) || 0)}
-                  fullWidth
-                  margin="normal"
-                />
-              </Box>
-            )
-            )}
+                <Grid container spacing={2}>
+                  {Object.entries(modelConfig.inlay).map(([key, value]) =>
+                  (
+                    <Grid size={6} key={`grid-inlay-${key}`}>
+                      <TextField
+                        label={labels.modelConfig.inlay[key]?.label || key}
+                        helperText={labels.modelConfig.inlay[key]?.help}
+                        type="number"
+                        value={value}
+                        onChange={(e) => handleModelConfigChange('inlay', key, parseFloat(e.target.value) || 0)}
+                        fullWidth
+                        margin="normal"
+                        variant="standard"
+                        select={isGridfinityMode && isSelectItem("gridfinity", key)}
+                        slotProps={{
+                          input: {
+                            endAdornment: <InputAdornment position="end" sx={{ marginRight: isGridfinityMode && isSelectItem("gridfinity", key) ? 3 : 0 }}>{isGridfinityMode && isSelectItem("gridfinity", key) ? selectItems['gridfinity'][key].unit : 'mm'}</InputAdornment>
+                          }
+                        }}
+                      >
+                        {isGridfinityMode && isSelectItem("gridfinity", key) && (
+                          selectItems['gridfinity'][key].options.map(([value, description]) => (
+                            <MenuItem key={`inlay-${key}-${value}`} value={value}>{description}</MenuItem>
+                          ))
+                        )}
+                      </TextField>
+                    </Grid>
+                  )
+                  )}
+                </Grid>
+              </AccordionDetails>
+            </Accordion>
 
-            <Typography variant="h6" gutterBottom>
-              Base Properties
-            </Typography>
+            <Accordion defaultExpanded>
+              <AccordionSummary expandIcon={<ExpandMore />}>
+                <CircleOutlined sx={{ marginRight: 0.5 }} />Base
+              </AccordionSummary>
+              <AccordionDetails>
+                <ToggleButtonGroup exclusive value={baseMode} fullWidth onChange={(e, value) => setBaseMode(value)}>
+                  <ToggleButton value="40k">40k</ToggleButton>
+                  <ToggleButton value="custom">Custom</ToggleButton>
+                </ToggleButtonGroup>
 
-            {Object.entries(modelConfig.base).map(([key, value]) =>
-            (
-              <Box sx={{ marginBottom: 0 }} key={`box-base-${key}`}>
-                <TextField
-                  label={key}
-                  type="number"
-                  value={value}
-                  onChange={(e) => handleModelConfigChange('base', key, parseFloat(e.target.value) || 0)}
-                  fullWidth
-                  margin="normal"
-                />
-              </Box>
-            )
-            )}
+                <Grid container spacing={2}>
+                  {Object.entries(modelConfig.base).map(([key, value]) =>
+                  (
+                    <Grid size={6} sx={{ marginBottom: 0 }} key={`box-base-${key}`}>
+                      <TextField
+                        label={labels.modelConfig.base[key]?.label || key}
+                        helperText={labels.modelConfig.base[key]?.help}
+                        type="number"
+                        value={value}
+                        onChange={(e) => handleModelConfigChange('base', key, parseFloat(e.target.value) || 0)}
+                        fullWidth
+                        margin="normal"
+                        variant="standard"
+                        select={is40kMode && isSelectItem("40k", key)}
+                        slotProps={{
+                          input: {
+                            endAdornment: <InputAdornment position="end" sx={{ marginRight: is40kMode && isSelectItem("40k", key) ? 3 : 0 }}>{is40kMode && isSelectItem("40k", key) ? selectItems['40k'][key].unit : 'mm'}</InputAdornment>
+                          }
+                        }}
+                      >
+                        {is40kMode && isSelectItem("40k", key) && (
+                          selectItems['40k'][key].options.map(([value, description]) => (
+                            <MenuItem key={`base-${key}-${value}`} value={value}>{description}</MenuItem>
+                          ))
+                        )}
+                      </TextField>
+                    </Grid>
+                  )
+                  )}
+                </Grid>
+              </AccordionDetails>
+            </Accordion>
 
-            <Typography variant="h6" gutterBottom>
-              Representation
-            </Typography>
-
-            {/* Color Picker */}
-            <Box sx={{ marginTop: 3, marginBottom: 1 }}>
-              <TextField
-                label="Select Color"
-                type="color"
-                value={previewConfig.color}
-                onChange={(e) => handlePreviewConfigChange('color', e.target.value)}
-                fullWidth
-                slotProps={{ inputLabel: { shrink: true } }}
-                variant="outlined"
-              />
-            </Box>
-
-            {/* Wireframe Toggle */}
-            <Box sx={{ marginBottom: 0 }}>
-              <FormControlLabel
-                control={
-                  <Switch
-                    checked={previewConfig.wireframe}
-                    onChange={(e) => handlePreviewConfigChange('wireframe', e.target.checked)}
-                    color="primary"
+            <Accordion>
+              <AccordionSummary expandIcon={<ExpandMore />}>
+                <Preview sx={{ marginRight: 0.5 }} />Preview
+              </AccordionSummary>
+              <AccordionDetails>
+                {/* Color Picker */}
+                <Box sx={{ marginBottom: 1 }}>
+                  <TextField
+                    label="Select Color"
+                    type="color"
+                    value={previewConfig.color}
+                    onChange={(e) => handlePreviewConfigChange('color', e.target.value)}
+                    fullWidth
+                    slotProps={{ inputLabel: { shrink: true } }}
+                    variant="outlined"
                   />
-                }
-                label="Wireframe Mode"
-              />
-            </Box>
+                </Box>
+
+                {/* Wireframe Toggle */}
+                <Box sx={{ marginBottom: 0 }}>
+                  <FormControlLabel
+                    control={
+                      <Switch
+                        checked={previewConfig.wireframe}
+                        onChange={(e) => handlePreviewConfigChange('wireframe', e.target.checked)}
+                        color="primary"
+                      />
+                    }
+                    label="Wireframe Mode"
+                  />
+                </Box>
+              </AccordionDetails>
+            </Accordion>
           </Box>
         </Drawer>
 
