@@ -40,12 +40,12 @@ function App() {
       cornerRadius: 3.2,
       depth: 3,
       margin: 1,
-      clearance: 0.25
+      clearance: 0.2
     },
     base: {
       size: 25,
       spacing: 1,
-      clearance: 0.5
+      clearance: 0.4
     }
   })
 

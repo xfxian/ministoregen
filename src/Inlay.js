@@ -69,21 +69,34 @@ function generateHexagonalHoles(length, width, margin, baseSize, baseSpacing, ba
     const xOffset = (width - patternWidth) / 2;
     const yOffset = (length - patternHeight) / 2;
 
-    for (let row = 0; row < numRows; row++) {
-        // **Swapped Condition**: Treat the first row as odd to allow n+1 columns
-        const isOddRow = row % 2 === 1;
+    console.debug(`Rows: ${numRows}, Columns: ${numCols}`)
 
-        const rowOffset = isOddRow ? 0 : colSpacing / 2;
+    if (numRows < 4 && numCols < 2) {
+        console.debug("Special handling for two holes or less");
 
-        for (let col = 0; col < numCols; col++) {
-            const x = -width / 2 + col * colSpacing + rowOffset + xOffset;
+        for (let row = 0; row < numRows; row++) {
+            const x = -width / 2 + xOffset + colSpacing / 2;
             const y = -length / 2 + row * rowHeight + yOffset + rowHeight / 2;
+            holes.push(baseHole(x, y, holeDiameter));
+        }
+    } else {
+        for (let row = 0; row < numRows; row++) {
+            const isOddRow = row % 2 === 1;
 
-            // Skip first hole of every odd row
-            if (!(isOddRow && col === 0))
-                holes.push(baseHole(x, y, holeDiameter));
+            const rowOffset = isOddRow ? 0 : colSpacing / 2;
+
+            for (let col = 0; col < numCols; col++) {
+                const x = -width / 2 + col * colSpacing + rowOffset + xOffset;
+                const y = -length / 2 + row * rowHeight + yOffset + rowHeight / 2;
+
+                // Skip first hole of every odd row
+                if (!(isOddRow && col === 0))
+                    holes.push(baseHole(x, y, holeDiameter));
+            }
         }
     }
+
+    console.debug(`Holes: ${holes.length}`)
 
     return holes;
 }
