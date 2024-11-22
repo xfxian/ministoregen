@@ -1,11 +1,12 @@
 import * as THREE from 'three';
+import { Line2 } from 'three-stdlib';
 
 /**
  * @param {number} length
  * @param {number} width
  * @param {number} cornerRadius
  */
-function inlayShape(length, width, cornerRadius) {
+function roundedRect(length, width, cornerRadius) {
     const shape = new THREE.Shape();
 
     shape.moveTo(-(width / 2), -(length / 2) + cornerRadius);
@@ -24,12 +25,12 @@ function inlayShape(length, width, cornerRadius) {
 /**
  * @param {number} x
  * @param {number} y
- * @param {number} baseSize
+ * @param {number} radius
  */
-function baseHole(x, y, baseSize) {
+function circle(x, y, radius) {
     const hole = new THREE.Shape();
 
-    hole.absarc(x, y, baseSize / 2, 0, Math.PI * 2, false);
+    hole.absarc(x, y, radius, 0, Math.PI * 2, false);
 
     return hole;
 }
@@ -40,9 +41,9 @@ function baseHole(x, y, baseSize) {
  * @param {number} width - Width of the inlay.
  * @param {number} baseSize - Diameter of each hole.
  * @param {number} margin - Optional margin from the inlay edges.
- * @returns {THREE.Shape[]} - Array of hole shapes.
+ * @returns {number[][]} - Array of hole positions.
  */
-function generateHexagonalHoles(length, width, margin, baseSize, baseSpacing, baseClearance) {
+function hexagonalLayout(length, width, margin, baseSize, baseSpacing, baseClearance) {
     const holes = [];
     const holeDiameter = baseSize + baseClearance;
 
@@ -77,7 +78,7 @@ function generateHexagonalHoles(length, width, margin, baseSize, baseSpacing, ba
         for (let row = 0; row < numRows; row++) {
             const x = -width / 2 + xOffset + colSpacing / 2;
             const y = -length / 2 + row * rowHeight + yOffset + rowHeight / 2;
-            holes.push(baseHole(x, y, holeDiameter));
+            holes.push([x, y]);
         }
     } else {
         for (let row = 0; row < numRows; row++) {
@@ -91,7 +92,7 @@ function generateHexagonalHoles(length, width, margin, baseSize, baseSpacing, ba
 
                 // Skip first hole of every odd row
                 if (!(isOddRow && col === 0))
-                    holes.push(baseHole(x, y, holeDiameter));
+                    holes.push([x, y]);
             }
         }
     }
@@ -107,17 +108,39 @@ function Inlay({ modelRef, modelConfig, previewConfig }) {
     const lengthWithClearance = inlay.length - inlay.clearance;
     const widthWithClearance = inlay.width - inlay.clearance;
 
-    const shape = inlayShape(lengthWithClearance, widthWithClearance, inlay.cornerRadius);
+    // Inlay
 
-    shape.holes = generateHexagonalHoles(lengthWithClearance, widthWithClearance, inlay.margin, base.size, base.spacing, base.clearance);
+    const inlayShape = roundedRect(lengthWithClearance, widthWithClearance, inlay.cornerRadius);
+    const holePositions = hexagonalLayout(lengthWithClearance, widthWithClearance, inlay.margin, base.size, base.spacing, base.clearance);
+    inlayShape.holes = holePositions.map(([x, y]) => circle(x, y, base.size / 2))
 
     const extrudeSettings = { steps: 4, depth: inlay.depth, curveSegments: 64, bevelEnabled: false };
 
+    // Visualization
+
+    const marginShape = roundedRect(lengthWithClearance - (inlay.margin * 2), widthWithClearance - (inlay.margin * 2), inlay.cornerRadius);
+    const marginGeometry = new THREE.BufferGeometry().setFromPoints(marginShape.getPoints());
+
+    const spacingGeometries = holePositions.map(([x, y]) => {
+        const spacingShape = circle(x, y, (base.size / 2) + (base.spacing / 2))
+        return new THREE.BufferGeometry().setFromPoints(spacingShape.getPoints(64));
+    });
+
     return (
-        <mesh ref={modelRef} position={[0, 0, 0]}>
-            <extrudeGeometry args={[shape, extrudeSettings]} />
-            <meshPhysicalMaterial wireframe={previewConfig.wireframe} color={previewConfig.color} clearcoat={0.5} clearcoatRoughness={0.4} reflectivity={0.25} />
-        </mesh>
+        <group>
+            <mesh ref={modelRef} position={[0, 0, 0]}>
+                <extrudeGeometry args={[inlayShape, extrudeSettings]} />
+                <meshPhysicalMaterial wireframe={previewConfig.wireframe} color={previewConfig.color} clearcoat={0.5} clearcoatRoughness={0.4} reflectivity={0.25} />
+            </mesh>
+            <line geometry={marginGeometry} position={[0, 0, inlay.depth + 0.1]}>
+                <lineDashedMaterial color={'blue'} dashSize={20} gapSize={5} linewidth={1} />
+            </line>
+            {spacingGeometries.map(spacingGeometry => (
+                <line geometry={spacingGeometry} position={[0, 0, inlay.depth + 0.1]}>
+                    <lineDashedMaterial color={'green'} />
+                </line>
+            ))}
+        </group>
     );
 }
 
