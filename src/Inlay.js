@@ -1,5 +1,4 @@
 import * as THREE from 'three';
-import { Line2 } from 'three-stdlib';
 
 /**
  * @param {number} length
