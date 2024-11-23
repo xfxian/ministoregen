@@ -27,7 +27,7 @@ jobs:
       # - run: npm test
       - uses: actions/upload-pages-artifact@v3
         with:
-          path: ${{ env.BUILD_PATH }}/build
+          path: ./build
   deploy:
     runs-on: ubuntu-latest
     needs: build
