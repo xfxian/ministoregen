@@ -1,6 +1,7 @@
 {
   "name": "ministoregen",
   "version": "0.1.0",
+  "homepage": "https://xfxian.github.io/ministoregen",
   "private": true,
   "dependencies": {
     "@emotion/react": "^11.13.3",
