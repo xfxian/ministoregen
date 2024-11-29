@@ -43,21 +43,38 @@ function App() {
       clearance: 0.2
     },
     base: {
-      size: 25,
-      spacing: 1,
-      clearance: 0.4
+      sections: [
+        {
+          share: 100,
+          size: 25,
+          // size: 105,
+          // ovalSize: 70,
+          spacing: 1,
+          clearance: 0.4
+        },
+        {
+          share: 0,
+          size: 32,
+          spacing: 1,
+          clearance: 0.4
+        }
+      ]
     }
   })
 
-  const handleModelConfigChange = (section, field, value) => {
-    setModelConfig((prevConfig) => ({
-      ...prevConfig,
-      [section]: {
-        ...prevConfig[section],
-        [field]: value,
-      },
-    }));
-  };
+  const handleInlayConfigChange = (field, value) => {
+    console.debug(`Setting inlay ${field} to ${value}`)
+    setModelConfig((prevConfig) => ({ ...prevConfig, inlay: { ...prevConfig.inlay, [field]: value } }))
+  }
+
+  const handleBaseSectionConfigChange = (section, field, value) => {
+    console.debug(`Setting base section #${section + 1} ${field} to ${value}`);
+    setModelConfig((prevConfig) => {
+      const newConfig = { ...prevConfig }
+      newConfig.base.sections[section][field] = value;
+      return newConfig;
+    })
+  }
 
   const [previewConfig, setPreviewConfig] = useState({
     wireframe: false,
@@ -100,6 +117,11 @@ function App() {
         }
       },
       base: {
+        share: {
+          label: "Share",
+          help: "Percentage of the inlay taken up by this section",
+          unit: "%"
+        },
         size: {
           label: "Size",
           help: "Diameter of your miniature bases"
@@ -244,7 +266,7 @@ function App() {
                         helperText={labels.modelConfig.inlay[key]?.help}
                         type="number"
                         value={value}
-                        onChange={(e) => handleModelConfigChange('inlay', key, parseFloat(e.target.value) || 0)}
+                        onChange={(e) => handleInlayConfigChange(key, parseFloat(e.target.value) || 0)}
                         fullWidth
                         margin="normal"
                         variant="standard"
@@ -279,7 +301,7 @@ function App() {
                 </ToggleButtonGroup>
 
                 <Grid container spacing={2}>
-                  {Object.entries(modelConfig.base).map(([key, value]) =>
+                  {Object.entries(modelConfig.base.sections[0]).map(([key, value]) =>
                   (
                     <Grid size={6} sx={{ marginBottom: 0 }} key={`box-base-${key}`}>
                       <TextField
@@ -287,14 +309,14 @@ function App() {
                         helperText={labels.modelConfig.base[key]?.help}
                         type="number"
                         value={value}
-                        onChange={(e) => handleModelConfigChange('base', key, parseFloat(e.target.value) || 0)}
+                        onChange={(e) => handleBaseSectionConfigChange(0, key, parseFloat(e.target.value) || 0)}
                         fullWidth
                         margin="normal"
                         variant="standard"
                         select={is40kMode && isSelectItem("40k", key)}
                         slotProps={{
                           input: {
-                            endAdornment: <InputAdornment position="end" sx={{ marginRight: is40kMode && isSelectItem("40k", key) ? 3 : 0 }}>{is40kMode && isSelectItem("40k", key) ? selectItems['40k'][key].unit : 'mm'}</InputAdornment>
+                            endAdornment: <InputAdornment position="end" sx={{ marginRight: is40kMode && isSelectItem("40k", key) ? 3 : 0 }}>{is40kMode && isSelectItem("40k", key) ? selectItems['40k'][key].unit : (labels.modelConfig.base[key]?.unit || 'mm')}</InputAdornment>
                           }
                         }}
                       >

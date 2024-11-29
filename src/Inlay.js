@@ -42,7 +42,7 @@ function circle(x, y, radius) {
  * @param {number} margin - Optional margin from the inlay edges.
  * @returns {number[][]} - Array of hole positions.
  */
-function hexagonalLayout(length, width, margin, baseSize, baseSpacing, baseClearance) {
+function hexagonalLayout(length, width, margin, baseSize, baseSpacing, baseClearance, sectionXOffset = 0, sectionYOffset = 0) {
     const holes = [];
     const holeDiameter = baseSize + baseClearance;
 
@@ -66,18 +66,22 @@ function hexagonalLayout(length, width, margin, baseSize, baseSpacing, baseClear
     const patternWidth = numCols * colSpacing;
 
     // Calculate offsets to center the pattern within the inlay
-    const xOffset = (width - patternWidth) / 2;
-    const yOffset = (length - patternHeight) / 2;
+    const xOffset = (usableWidth - patternWidth) / 2 + sectionXOffset;
+    const yOffset = (usableLength - patternHeight) / 2 + sectionYOffset;
 
     console.debug(`Rows: ${numRows}, Columns: ${numCols}`)
 
-    if (numRows < 4 && numCols < 2) {
-        console.debug("Special handling for two holes or less");
+    if (numCols == 1) {
+        console.debug("Special handling for single column");
+        // Recalculate row height for single column
+        const singleColumnRowHeight = holeDiameter + (baseSpacing / 2)
+        const singleColumnNumRows = Math.floor(usableLength / singleColumnRowHeight);
+        const singleColumnPatternHeight = singleColumnNumRows * singleColumnRowHeight;
+        const singleColumnYOffset = (usableLength - singleColumnPatternHeight) / 2 + sectionYOffset;
 
-        for (let row = 0; row < numRows; row++) {
-            const x = -width / 2 + xOffset + colSpacing / 2;
-            const y = -length / 2 + row * rowHeight + yOffset + rowHeight / 2;
-            holes.push([x, y]);
+        for (let row = 0; row < singleColumnNumRows; row++) {
+            const y = -usableLength / 2 + row * singleColumnRowHeight + singleColumnYOffset + singleColumnRowHeight / 2;
+            holes.push([0, y]);
         }
     } else {
         for (let row = 0; row < numRows; row++) {
@@ -86,8 +90,8 @@ function hexagonalLayout(length, width, margin, baseSize, baseSpacing, baseClear
             const rowOffset = isOddRow ? 0 : colSpacing / 2;
 
             for (let col = 0; col < numCols; col++) {
-                const x = -width / 2 + col * colSpacing + rowOffset + xOffset;
-                const y = -length / 2 + row * rowHeight + yOffset + rowHeight / 2;
+                const x = -usableWidth / 2 + col * colSpacing + rowOffset + xOffset;
+                const y = -usableLength / 2 + row * rowHeight + yOffset + rowHeight / 2;
 
                 // Skip first hole of every odd row
                 if (!(isOddRow && col === 0))
@@ -110,8 +114,26 @@ function Inlay({ modelRef, modelConfig, previewConfig }) {
     // Inlay
 
     const inlayShape = roundedRect(lengthWithClearance, widthWithClearance, inlay.cornerRadius);
-    const holePositions = hexagonalLayout(lengthWithClearance, widthWithClearance, inlay.margin, base.size, base.spacing, base.clearance);
-    inlayShape.holes = holePositions.map(([x, y]) => circle(x, y, base.size / 2))
+
+    base.sections.flatMap((section, index) => {
+        console.debug(`Section #${index + 1}`);
+        const lengthWithClearanceAndMargin = lengthWithClearance - inlay.margin * 2;
+        console.debug(`Length with clearance ${lengthWithClearance} and margin ${lengthWithClearanceAndMargin}`);
+        console.debug(`Base share: ${section.share}`);
+        const lengthWithshare = (section.share * lengthWithClearanceAndMargin) / 100;
+        console.debug(`Length with share ${lengthWithshare}`);
+        const accumulatedYPercentage = base.sections
+            .map((section, index) => { console.log(`Section ${index}: ${section.share}`); return section.share })
+            .reduce((prev, curr, i) => { console.log(`Prev ${prev}`); return (i < index ? prev + curr : prev) }, 0);
+        const accumulatedYOffset = (accumulatedYPercentage * lengthWithClearanceAndMargin) / 100;
+        console.debug(`Accumulated Y Percentage: ${accumulatedYPercentage}, Offset: ${accumulatedYOffset}`);
+
+        const sectionYOffset = (-lengthWithClearanceAndMargin / 2) + accumulatedYOffset + (lengthWithshare / 2);
+
+        const widthWithshare = widthWithClearance
+        const holePositions = hexagonalLayout(lengthWithshare, widthWithshare, inlay.margin, section.size, section.spacing, section.clearance, 0, sectionYOffset)
+        inlayShape.holes = inlayShape.holes.concat(holePositions.map(([x, y]) => circle(x, y, section.size / 2)));
+    });
 
     const extrudeSettings = { steps: 4, depth: inlay.depth, curveSegments: 64, bevelEnabled: false };
 
@@ -120,10 +142,10 @@ function Inlay({ modelRef, modelConfig, previewConfig }) {
     const marginShape = roundedRect(lengthWithClearance - (inlay.margin * 2), widthWithClearance - (inlay.margin * 2), inlay.cornerRadius);
     const marginGeometry = new THREE.BufferGeometry().setFromPoints(marginShape.getPoints());
 
-    const spacingGeometries = holePositions.map(([x, y]) => {
-        const spacingShape = circle(x, y, (base.size / 2) + (base.spacing / 2))
-        return new THREE.BufferGeometry().setFromPoints(spacingShape.getPoints(64));
-    });
+    // const spacingGeometries = holePositions.map(([x, y]) => {
+    //     const spacingShape = circle(x, y, (base.size / 2) + (base.spacing / 2))
+    //     return new THREE.BufferGeometry().setFromPoints(spacingShape.getPoints(64));
+    // });
 
     return (
         <group>
@@ -134,11 +156,11 @@ function Inlay({ modelRef, modelConfig, previewConfig }) {
             <line geometry={marginGeometry} position={[0, 0, inlay.depth + 0.1]}>
                 <lineDashedMaterial color={'blue'} dashSize={20} gapSize={5} linewidth={1} />
             </line>
-            {spacingGeometries.map(spacingGeometry => (
+            {/* {spacingGeometries.map(spacingGeometry => (
                 <line geometry={spacingGeometry} position={[0, 0, inlay.depth + 0.1]}>
                     <lineDashedMaterial color={'green'} />
                 </line>
-            ))}
+            ))} */}
         </group>
     );
 }
