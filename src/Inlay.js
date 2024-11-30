@@ -22,14 +22,17 @@ function roundedRect(length, width, cornerRadius) {
 }
 
 /**
- * @param {number} x
- * @param {number} y
- * @param {number} radius
+ * @param {number} x - The x-coordinate of the ellipse center.
+ * @param {number} y - The y-coordinate of the ellipse center.
+ * @param {number} radiusX - The horizontal radius of the ellipse.
+ * @param {number} radiusY - The vertical radius of the ellipse.
+ * @returns {THREE.Shape} - The generated ellipse shape.
  */
-function circle(x, y, radius) {
+function ellipse(x, y, radiusX, radiusY) {
     const hole = new THREE.Shape();
 
-    hole.absarc(x, y, radius, 0, Math.PI * 2, false);
+    // Create an absolute ellipse path
+    hole.absellipse(x, y, radiusX, radiusY, 0, Math.PI * 2, false);
 
     return hole;
 }
@@ -38,19 +41,21 @@ function circle(x, y, radius) {
  * Generates a hexagonal pattern of holes within the inlay.
  * @param {number} length - Length of the inlay.
  * @param {number} width - Width of the inlay.
- * @param {number} baseSize - Diameter of each hole.
+ * @param {number} baseSizeX - Width of each hole.
+ * @param {number} baseSizeY - Length of each hole.
  * @param {number} margin - Optional margin from the inlay edges.
  * @returns {number[][]} - Array of hole positions.
  */
-function hexagonalLayout(length, width, margin, baseSize, baseSpacing, baseClearance, sectionXOffset = 0, sectionYOffset = 0) {
+function hexagonalLayout(length, width, margin, baseSizeX, baseSizeY, baseSpacing, baseClearance, sectionXOffset = 0, sectionYOffset = 0) {
     const holes = [];
-    const holeDiameter = baseSize + baseClearance;
+    const holeDiameterX = baseSizeX + baseClearance;
+    const holeDiameterY = baseSizeY + baseClearance;
 
     // Calculate optimal hexagon size to prevent overlapping
-    const s = holeDiameter / Math.sqrt(3);
+    const s = holeDiameterY / Math.sqrt(3);
 
     // Calculate spacing based on hexagonal packing
-    const colSpacing = holeDiameter + (baseSpacing / 2); // Horizontal distance between centers
+    const colSpacing = holeDiameterX + (baseSpacing / 2); // Horizontal distance between centers
     const rowHeight = 1.5 * s + (baseSpacing / 2); // Vertical distance between centers (~0.866 * diameter)
 
     // Calculate usable dimensions considering margin
@@ -74,7 +79,7 @@ function hexagonalLayout(length, width, margin, baseSize, baseSpacing, baseClear
     if (numCols == 1) {
         console.debug("Special handling for single column");
         // Recalculate row height for single column
-        const singleColumnRowHeight = holeDiameter + (baseSpacing / 2)
+        const singleColumnRowHeight = holeDiameterY + (baseSpacing / 2)
         const singleColumnNumRows = Math.floor(usableLength / singleColumnRowHeight);
         const singleColumnPatternHeight = singleColumnNumRows * singleColumnRowHeight;
         const singleColumnYOffset = (usableLength - singleColumnPatternHeight) / 2 + sectionYOffset;
@@ -120,19 +125,19 @@ function Inlay({ modelRef, modelConfig, previewConfig }) {
         const lengthWithClearanceAndMargin = lengthWithClearance - inlay.margin * 2;
         console.debug(`Length with clearance ${lengthWithClearance} and margin ${lengthWithClearanceAndMargin}`);
         console.debug(`Base share: ${section.share}`);
-        const lengthWithshare = (section.share * lengthWithClearanceAndMargin) / 100;
-        console.debug(`Length with share ${lengthWithshare}`);
+        const lengthWithShare = (section.share * lengthWithClearanceAndMargin) / 100;
+        console.debug(`Length with share ${lengthWithShare}`);
         const accumulatedYPercentage = base.sections
             .map((section, index) => { console.log(`Section ${index}: ${section.share}`); return section.share })
             .reduce((prev, curr, i) => { console.log(`Prev ${prev}`); return (i < index ? prev + curr : prev) }, 0);
         const accumulatedYOffset = (accumulatedYPercentage * lengthWithClearanceAndMargin) / 100;
         console.debug(`Accumulated Y Percentage: ${accumulatedYPercentage}, Offset: ${accumulatedYOffset}`);
 
-        const sectionYOffset = (-lengthWithClearanceAndMargin / 2) + accumulatedYOffset + (lengthWithshare / 2);
+        const sectionYOffset = (-lengthWithClearanceAndMargin / 2) + accumulatedYOffset + (lengthWithShare / 2);
 
         const widthWithshare = widthWithClearance
-        const holePositions = hexagonalLayout(lengthWithshare, widthWithshare, inlay.margin, section.size, section.spacing, section.clearance, 0, sectionYOffset)
-        inlayShape.holes = inlayShape.holes.concat(holePositions.map(([x, y]) => circle(x, y, section.size / 2)));
+        const holePositions = hexagonalLayout(lengthWithShare, widthWithshare, inlay.margin, section.sizeX, section.sizeY, section.spacing, section.clearance, 0, sectionYOffset)
+        inlayShape.holes = inlayShape.holes.concat(holePositions.map(([x, y]) => ellipse(x, y, section.sizeX / 2, section.sizeY / 2)));
     });
 
     const extrudeSettings = { steps: 4, depth: inlay.depth, curveSegments: 64, bevelEnabled: false };

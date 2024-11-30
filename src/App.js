@@ -1,11 +1,14 @@
 import { CircleOutlined, CropPortrait, Download, ExpandMore, Preview } from '@mui/icons-material';
 import {
   Accordion,
+  AccordionActions,
   AccordionDetails,
   AccordionSummary,
   AppBar,
+  Badge,
   Box,
   Button,
+  Chip,
   CssBaseline,
   Dialog,
   DialogActions,
@@ -17,6 +20,7 @@ import {
   Grid2 as Grid,
   InputAdornment,
   MenuItem,
+  Stack,
   Switch,
   TextField,
   ToggleButton,
@@ -46,15 +50,8 @@ function App() {
       sections: [
         {
           share: 100,
-          size: 25,
-          // size: 105,
-          // ovalSize: 70,
-          spacing: 1,
-          clearance: 0.4
-        },
-        {
-          share: 0,
-          size: 32,
+          sizeX: 25,
+          sizeY: 25,
           spacing: 1,
           clearance: 0.4
         }
@@ -72,8 +69,48 @@ function App() {
     setModelConfig((prevConfig) => {
       const newConfig = { ...prevConfig }
       newConfig.base.sections[section][field] = value;
+      newConfig.base.sections = redistributeSectionShares(newConfig.base.sections, section);
       return newConfig;
     })
+  }
+
+  const handleBaseSectionAdd = (afterSectionIndex) => {
+    setModelConfig((prevConfig) => {
+      const newConfig = { ...prevConfig };
+      newConfig.base.sections.splice(afterSectionIndex + 1, 0, {
+        share: prevConfig.base.sections[afterSectionIndex].share,
+        sizeX: 25,
+        sizeY: 25,
+        spacing: 1,
+        clearance: 0.4
+      });
+      newConfig.base.sections = redistributeSectionShares(newConfig.base.sections);
+      return newConfig;
+    })
+  }
+
+  const handleBaseSectionRemove = (removeSectionIndex) => {
+    setModelConfig((prevConfig) => {
+      const newConfig = { ...prevConfig };
+      newConfig.base.sections.splice(removeSectionIndex, 1);
+      newConfig.base.sections = redistributeSectionShares(newConfig.base.sections);
+      return newConfig;
+    })
+  }
+
+  const redistributeSectionShares = (sections, skipSectionIndex = -1) => {
+    console.debug("Redistributing section shares...");
+    const totalShares = sections.map(section => section.share).reduce((prev, curr) => prev + curr);
+    console.debug(`Total shares: ${totalShares}`);
+    for (let [sectionIndex, section] of sections.entries()) {
+      if (sectionIndex == skipSectionIndex) continue;
+      const skipSectionShare = sections[skipSectionIndex]?.share || 0;
+      console.debug(`Section #${sectionIndex + 1} share: ${section.share}`);
+      console.debug(`Skip section share: ${skipSectionShare}`);
+      console.debug(((section.share / (totalShares - skipSectionShare)) * 100));
+      section.share = ((section.share / (totalShares - skipSectionShare)) * (100 - skipSectionShare));
+    }
+    return sections;
   }
 
   const [previewConfig, setPreviewConfig] = useState({
@@ -122,9 +159,13 @@ function App() {
           help: "Percentage of the inlay taken up by this section",
           unit: "%"
         },
-        size: {
-          label: "Size",
-          help: "Diameter of your miniature bases"
+        sizeX: {
+          label: "Base Width",
+          help: "Width of your miniature bases"
+        },
+        sizeY: {
+          label: "Base Length",
+          help: "Length of your miniature bases"
         },
         spacing: {
           label: "Spacing",
@@ -290,48 +331,62 @@ function App() {
               </AccordionDetails>
             </Accordion>
 
-            <Accordion defaultExpanded>
-              <AccordionSummary expandIcon={<ExpandMore />}>
-                <CircleOutlined sx={{ marginRight: 0.5 }} />Base
-              </AccordionSummary>
-              <AccordionDetails>
-                <ToggleButtonGroup exclusive value={baseMode} fullWidth onChange={(e, value) => setBaseMode(value)}>
-                  <ToggleButton value="40k">40k</ToggleButton>
-                  <ToggleButton value="custom">Custom</ToggleButton>
-                </ToggleButtonGroup>
+            {modelConfig.base.sections.map((section, sectionIndex) => (
+              <Accordion defaultExpanded key={`section-${sectionIndex}`}>
+                <AccordionSummary expandIcon={<ExpandMore />}>
+                  <Stack direction="row" alignItems="center" spacing={1}>
+                    <Stack direction="row" alignItems="center" spacing={0.5}>
+                      <CircleOutlined />
+                      <span>Base</span>
+                    </Stack>
+                    <Chip label={`Section ${sectionIndex + 1}`} variant="outlined" color="primary" />
+                  </Stack>
+                </AccordionSummary>
+                <AccordionDetails>
+                  <ToggleButtonGroup exclusive value={baseMode} fullWidth onChange={(e, value) => setBaseMode(value)}>
+                    <ToggleButton value="40k">40k</ToggleButton>
+                    <ToggleButton value="custom">Custom</ToggleButton>
+                  </ToggleButtonGroup>
 
-                <Grid container spacing={2}>
-                  {Object.entries(modelConfig.base.sections[0]).map(([key, value]) =>
-                  (
-                    <Grid size={6} sx={{ marginBottom: 0 }} key={`box-base-${key}`}>
-                      <TextField
-                        label={labels.modelConfig.base[key]?.label || key}
-                        helperText={labels.modelConfig.base[key]?.help}
-                        type="number"
-                        value={value}
-                        onChange={(e) => handleBaseSectionConfigChange(0, key, parseFloat(e.target.value) || 0)}
-                        fullWidth
-                        margin="normal"
-                        variant="standard"
-                        select={is40kMode && isSelectItem("40k", key)}
-                        slotProps={{
-                          input: {
-                            endAdornment: <InputAdornment position="end" sx={{ marginRight: is40kMode && isSelectItem("40k", key) ? 3 : 0 }}>{is40kMode && isSelectItem("40k", key) ? selectItems['40k'][key].unit : (labels.modelConfig.base[key]?.unit || 'mm')}</InputAdornment>
-                          }
-                        }}
-                      >
-                        {is40kMode && isSelectItem("40k", key) && (
-                          selectItems['40k'][key].options.map(([value, description]) => (
-                            <MenuItem key={`base-${key}-${value}`} value={value}>{description}</MenuItem>
-                          ))
-                        )}
-                      </TextField>
-                    </Grid>
-                  )
-                  )}
-                </Grid>
-              </AccordionDetails>
-            </Accordion>
+                  <Grid container spacing={2}>
+                    {Object.entries(section).map(([key, value]) =>
+                    (
+                      <Grid size={6} sx={{ marginBottom: 0 }} key={`box-base-${key}`}>
+                        <TextField
+                          label={labels.modelConfig.base[key]?.label || key}
+                          helperText={labels.modelConfig.base[key]?.help}
+                          type="number"
+                          value={value}
+                          onChange={(e) => handleBaseSectionConfigChange(sectionIndex, key, parseFloat(e.target.value) || 0)}
+                          fullWidth
+                          margin="normal"
+                          variant="standard"
+                          select={is40kMode && isSelectItem("40k", key)}
+                          slotProps={{
+                            input: {
+                              endAdornment: <InputAdornment position="end" sx={{ marginRight: is40kMode && isSelectItem("40k", key) ? 3 : 0 }}>{is40kMode && isSelectItem("40k", key) ? selectItems['40k'][key].unit : (labels.modelConfig.base[key]?.unit || 'mm')}</InputAdornment>
+                            }
+                          }}
+                        >
+                          {is40kMode && isSelectItem("40k", key) && (
+                            selectItems['40k'][key].options.map(([value, description]) => (
+                              <MenuItem key={`base-${key}-${value}`} value={value}>{description}</MenuItem>
+                            ))
+                          )}
+                        </TextField>
+                      </Grid>
+                    )
+                    )}
+                  </Grid>
+                </AccordionDetails>
+                <AccordionActions>
+                  {(sectionIndex == (modelConfig.base.sections.length - 1) && (
+                    <Button onClick={() => handleBaseSectionAdd(sectionIndex)}>Add</Button>
+                  ))}
+                  <Button onClick={() => handleBaseSectionRemove(sectionIndex)}>Remove</Button>
+                </AccordionActions>
+              </Accordion>
+            ))}
 
             <Accordion>
               <AccordionSummary expandIcon={<ExpandMore />}>
