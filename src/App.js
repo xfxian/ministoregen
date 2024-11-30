@@ -5,7 +5,6 @@ import {
   AccordionDetails,
   AccordionSummary,
   AppBar,
-  Badge,
   Box,
   Button,
   Chip,
@@ -52,6 +51,7 @@ function App() {
           share: 100,
           sizeX: 25,
           sizeY: 25,
+          curvatureFactor: 0.55,
           spacing: 1,
           clearance: 0.4
         }
@@ -81,6 +81,7 @@ function App() {
         share: prevConfig.base.sections[afterSectionIndex].share,
         sizeX: 25,
         sizeY: 25,
+        curvatureFactor: 0.55,
         spacing: 1,
         clearance: 0.4
       });
@@ -103,7 +104,7 @@ function App() {
     const totalShares = sections.map(section => section.share).reduce((prev, curr) => prev + curr);
     console.debug(`Total shares: ${totalShares}`);
     for (let [sectionIndex, section] of sections.entries()) {
-      if (sectionIndex == skipSectionIndex) continue;
+      if (sectionIndex === skipSectionIndex) continue;
       const skipSectionShare = sections[skipSectionIndex]?.share || 0;
       console.debug(`Section #${sectionIndex + 1} share: ${section.share}`);
       console.debug(`Skip section share: ${skipSectionShare}`);
@@ -166,6 +167,11 @@ function App() {
         sizeY: {
           label: "Base Length",
           help: "Length of your miniature bases"
+        },
+        curvatureFactor: {
+          label: "Curvature Factor",
+          help: "Play with this factor to modify the curvature of the ellipse",
+          unit: ""
         },
         spacing: {
           label: "Spacing",
@@ -380,7 +386,7 @@ function App() {
                   </Grid>
                 </AccordionDetails>
                 <AccordionActions>
-                  {(sectionIndex == (modelConfig.base.sections.length - 1) && (
+                  {(sectionIndex === (modelConfig.base.sections.length - 1) && (
                     <Button onClick={() => handleBaseSectionAdd(sectionIndex)}>Add</Button>
                   ))}
                   <Button onClick={() => handleBaseSectionRemove(sectionIndex)}>Remove</Button>

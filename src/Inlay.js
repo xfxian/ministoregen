@@ -21,18 +21,51 @@ function roundedRect(length, width, cornerRadius) {
     return shape;
 }
 
+// /**
+//  * @param {number} x - The x-coordinate of the ellipse center.
+//  * @param {number} y - The y-coordinate of the ellipse center.
+//  * @param {number} radiusX - The horizontal radius of the ellipse.
+//  * @param {number} radiusY - The vertical radius of the ellipse.
+//  * @returns {THREE.Shape} - The generated ellipse shape.
+//  */
+// function ellipse(x, y, radiusX, radiusY) {
+//     const hole = new THREE.Shape();
+
+//     // Create an absolute ellipse path
+//     hole.absellipse(x, y, radiusX, radiusY, 0, Math.PI * 2, false);
+
+//     return hole;
+// }
+
 /**
  * @param {number} x - The x-coordinate of the ellipse center.
  * @param {number} y - The y-coordinate of the ellipse center.
  * @param {number} radiusX - The horizontal radius of the ellipse.
  * @param {number} radiusY - The vertical radius of the ellipse.
- * @returns {THREE.Shape} - The generated ellipse shape.
+ * @param {number} curvatureFactor - Factor to adjust curvature at the ends.
+ * @returns {THREE.Shape} - The generated Bézier-based ellipse shape.
  */
-function ellipse(x, y, radiusX, radiusY) {
+function bezierEllipse(x, y, radiusX, radiusY, curvatureFactor = 0.55) {
     const hole = new THREE.Shape();
 
-    // Create an absolute ellipse path
-    hole.absellipse(x, y, radiusX, radiusY, 0, Math.PI * 2, false);
+    // Calculate control points based on the curvature factor
+    const cX = radiusX * curvatureFactor;
+    const cY = radiusY * curvatureFactor;
+
+    // Start at the top
+    hole.moveTo(x, y + radiusY);
+
+    // Top-left curve (Counter-Clockwise)
+    hole.bezierCurveTo(x - cX, y + radiusY, x - radiusX, y + cY, x - radiusX, y);
+
+    // Bottom-left curve
+    hole.bezierCurveTo(x - radiusX, y - cY, x - cX, y - radiusY, x, y - radiusY);
+
+    // Bottom-right curve
+    hole.bezierCurveTo(x + cX, y - radiusY, x + radiusX, y - cY, x + radiusX, y);
+
+    // Top-right curve
+    hole.bezierCurveTo(x + radiusX, y + cY, x + cX, y + radiusY, x, y + radiusY);
 
     return hole;
 }
@@ -76,7 +109,7 @@ function hexagonalLayout(length, width, margin, baseSizeX, baseSizeY, baseSpacin
 
     console.debug(`Rows: ${numRows}, Columns: ${numCols}`)
 
-    if (numCols == 1) {
+    if (numCols === 1) {
         console.debug("Special handling for single column");
         // Recalculate row height for single column
         const singleColumnRowHeight = holeDiameterY + (baseSpacing / 2)
@@ -137,7 +170,8 @@ function Inlay({ modelRef, modelConfig, previewConfig }) {
 
         const widthWithshare = widthWithClearance
         const holePositions = hexagonalLayout(lengthWithShare, widthWithshare, inlay.margin, section.sizeX, section.sizeY, section.spacing, section.clearance, 0, sectionYOffset)
-        inlayShape.holes = inlayShape.holes.concat(holePositions.map(([x, y]) => ellipse(x, y, section.sizeX / 2, section.sizeY / 2)));
+        inlayShape.holes = inlayShape.holes.concat(holePositions.map(([x, y]) => bezierEllipse(x, y, (section.sizeX / 2) + (section.clearance / 2), (section.sizeY / 2) + (section.clearance / 2), section.curvatureFactor)));
+        return holePositions;
     });
 
     const extrudeSettings = { steps: 4, depth: inlay.depth, curveSegments: 64, bevelEnabled: false };
