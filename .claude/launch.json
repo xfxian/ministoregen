@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "dev",
+      "runtimeExecutable": "/Users/xfxian/.local/share/mise/installs/node/22.16.0/bin/node",
+      "runtimeArgs": ["/Users/xfxian/Git/ministoregen/node_modules/.bin/vite"],
+      "port": 5173
+    }
+  ]
+}

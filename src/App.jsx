@@ -28,90 +28,62 @@ import {
   Typography
 } from '@mui/material';
 import { createTheme, ThemeProvider } from '@mui/material/styles';
-import ModelPreview from 'ModelPreview';
+import { DRAWER_WIDTH, DEFAULT_SECTION, DEFAULT_INLAY, SELECT_ITEMS } from './config';
+import ModelPreview from './ModelPreview';
 import { useRef, useState } from 'react';
 import { STLExporter } from 'three-stdlib';
 import './App.css';
 
 function App() {
-  const drawerWidth = 400;
-
   const [modelConfig, setModelConfig] = useState({
-    inlay: {
-      length: 121.9,
-      width: 79.9,
-      cornerRadius: 3.2,
-      depth: 3,
-      margin: 1,
-      clearance: 0.2
-    },
+    inlay: { ...DEFAULT_INLAY },
     base: {
-      sections: [
-        {
-          share: 100,
-          sizeX: 25,
-          sizeY: 25,
-          curvatureFactor: 0.55,
-          spacing: 1,
-          clearance: 0.4
-        }
-      ]
+      sections: [{ share: 100, ...DEFAULT_SECTION }]
     }
   })
 
   const handleInlayConfigChange = (field, value) => {
-    console.debug(`Setting inlay ${field} to ${value}`)
     setModelConfig((prevConfig) => ({ ...prevConfig, inlay: { ...prevConfig.inlay, [field]: value } }))
   }
 
   const handleBaseSectionConfigChange = (section, field, value) => {
-    console.debug(`Setting base section #${section + 1} ${field} to ${value}`);
     setModelConfig((prevConfig) => {
-      const newConfig = { ...prevConfig }
-      newConfig.base.sections[section][field] = value;
-      newConfig.base.sections = redistributeSectionShares(newConfig.base.sections, section);
-      return newConfig;
+      const updatedSections = prevConfig.base.sections.map((s, i) =>
+        i === section ? { ...s, [field]: value } : s
+      );
+      return { ...prevConfig, base: { ...prevConfig.base, sections: redistributeSectionShares(updatedSections, section) } };
     })
   }
 
   const handleBaseSectionAdd = (afterSectionIndex) => {
     setModelConfig((prevConfig) => {
-      const newConfig = { ...prevConfig };
-      newConfig.base.sections.splice(afterSectionIndex + 1, 0, {
+      const newSection = {
         share: prevConfig.base.sections[afterSectionIndex].share,
-        sizeX: 25,
-        sizeY: 25,
-        curvatureFactor: 0.55,
-        spacing: 1,
-        clearance: 0.4
-      });
-      newConfig.base.sections = redistributeSectionShares(newConfig.base.sections);
-      return newConfig;
+        ...DEFAULT_SECTION
+      };
+      const updatedSections = [
+        ...prevConfig.base.sections.slice(0, afterSectionIndex + 1),
+        newSection,
+        ...prevConfig.base.sections.slice(afterSectionIndex + 1)
+      ];
+      return { ...prevConfig, base: { ...prevConfig.base, sections: redistributeSectionShares(updatedSections) } };
     })
   }
 
   const handleBaseSectionRemove = (removeSectionIndex) => {
     setModelConfig((prevConfig) => {
-      const newConfig = { ...prevConfig };
-      newConfig.base.sections.splice(removeSectionIndex, 1);
-      newConfig.base.sections = redistributeSectionShares(newConfig.base.sections);
-      return newConfig;
+      const updatedSections = prevConfig.base.sections.filter((_, i) => i !== removeSectionIndex);
+      return { ...prevConfig, base: { ...prevConfig.base, sections: redistributeSectionShares(updatedSections) } };
     })
   }
 
   const redistributeSectionShares = (sections, skipSectionIndex = -1) => {
-    console.debug("Redistributing section shares...");
     const totalShares = sections.map(section => section.share).reduce((prev, curr) => prev + curr);
-    console.debug(`Total shares: ${totalShares}`);
-    for (let [sectionIndex, section] of sections.entries()) {
-      if (sectionIndex === skipSectionIndex) continue;
-      const skipSectionShare = sections[skipSectionIndex]?.share || 0;
-      console.debug(`Section #${sectionIndex + 1} share: ${section.share}`);
-      console.debug(`Skip section share: ${skipSectionShare}`);
-      console.debug(((section.share / (totalShares - skipSectionShare)) * 100));
-      section.share = ((section.share / (totalShares - skipSectionShare)) * (100 - skipSectionShare));
-    }
-    return sections;
+    const skipSectionShare = sections[skipSectionIndex]?.share || 0;
+    return sections.map((section, sectionIndex) => {
+      if (sectionIndex === skipSectionIndex) return section;
+      return { ...section, share: (section.share / (totalShares - skipSectionShare)) * (100 - skipSectionShare) };
+    });
   }
 
   const [previewConfig, setPreviewConfig] = useState({
@@ -190,41 +162,7 @@ function App() {
   const [inlayMode, setInlayMode] = useState("gridfinity");
   const [baseMode, setBaseMode] = useState("40k");
 
-  // TODO: Don't hardcode these, every Gridfinity bin is unfortunately different
-  const gridfinityUnit = 42;
-  const gridfinitySpacer = 0.5;
-  const gridfinityWallThickness = 1.8;
-  const gridfinityDimensionOptions = [
-    1, 2, 3, 4, 5, 6, 7, 8
-  ].map(n => [(n * gridfinityUnit) - gridfinitySpacer - (2 * gridfinityWallThickness), n])
-
-  const selectItems = {
-    "gridfinity": {
-      length: {
-        options: gridfinityDimensionOptions,
-        unit: "u",
-        help: "Length of your Gridfinity bin"
-      },
-      width: {
-        options: gridfinityDimensionOptions,
-        unit: "u",
-        help: "Width of your Gridfinity bin"
-      }
-    },
-    "40k": {
-      size: {
-        options: [
-          [25, "25"],
-          [28, "28"],
-          [32, "32"],
-          [40, "40"]
-        ],
-        unit: "mm"
-      }
-    },
-  }
-
-  const isSelectItem = (mode, key) => selectItems[mode] && selectItems[mode][key] !== undefined
+  const isSelectItem = (mode, key) => SELECT_ITEMS[mode] && SELECT_ITEMS[mode][key] !== undefined
 
   const isGridfinityMode = inlayMode === "gridfinity";
   const is40kMode = baseMode === "40k";
@@ -281,10 +219,10 @@ function App() {
         <Drawer
           variant="permanent"
           sx={{
-            width: drawerWidth,
+            width: DRAWER_WIDTH,
             flexShrink: 0,
             [`& .MuiDrawer-paper`]: {
-              width: drawerWidth,
+              width: DRAWER_WIDTH,
               boxSizing: 'border-box',
               overflowX: 'hidden'
             },
@@ -292,7 +230,7 @@ function App() {
         >
           <Toolbar />
           <Box
-            sx={{ width: drawerWidth, padding: 2, backgroundColor: 'background.default' }}
+            sx={{ width: DRAWER_WIDTH, padding: 2, backgroundColor: 'background.default' }}
           >
             <Accordion defaultExpanded>
               <AccordionSummary expandIcon={<ExpandMore />}>
@@ -320,12 +258,12 @@ function App() {
                         select={isGridfinityMode && isSelectItem("gridfinity", key)}
                         slotProps={{
                           input: {
-                            endAdornment: <InputAdornment position="end" sx={{ marginRight: isGridfinityMode && isSelectItem("gridfinity", key) ? 3 : 0 }}>{isGridfinityMode && isSelectItem("gridfinity", key) ? selectItems['gridfinity'][key].unit : 'mm'}</InputAdornment>
+                            endAdornment: <InputAdornment position="end" sx={{ marginRight: isGridfinityMode && isSelectItem("gridfinity", key) ? 3 : 0 }}>{isGridfinityMode && isSelectItem("gridfinity", key) ? SELECT_ITEMS['gridfinity'][key].unit : 'mm'}</InputAdornment>
                           }
                         }}
                       >
                         {isGridfinityMode && isSelectItem("gridfinity", key) && (
-                          selectItems['gridfinity'][key].options.map(([value, description]) => (
+                          SELECT_ITEMS['gridfinity'][key].options.map(([value, description]) => (
                             <MenuItem key={`inlay-${key}-${value}`} value={value}>{description}</MenuItem>
                           ))
                         )}
@@ -370,12 +308,12 @@ function App() {
                           select={is40kMode && isSelectItem("40k", key)}
                           slotProps={{
                             input: {
-                              endAdornment: <InputAdornment position="end" sx={{ marginRight: is40kMode && isSelectItem("40k", key) ? 3 : 0 }}>{is40kMode && isSelectItem("40k", key) ? selectItems['40k'][key].unit : (labels.modelConfig.base[key]?.unit || 'mm')}</InputAdornment>
+                              endAdornment: <InputAdornment position="end" sx={{ marginRight: is40kMode && isSelectItem("40k", key) ? 3 : 0 }}>{is40kMode && isSelectItem("40k", key) ? SELECT_ITEMS['40k'][key].unit : (labels.modelConfig.base[key]?.unit || 'mm')}</InputAdornment>
                             }
                           }}
                         >
                           {is40kMode && isSelectItem("40k", key) && (
-                            selectItems['40k'][key].options.map(([value, description]) => (
+                            SELECT_ITEMS['40k'][key].options.map(([value, description]) => (
                               <MenuItem key={`base-${key}-${value}`} value={value}>{description}</MenuItem>
                             ))
                           )}

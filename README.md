@@ -1,70 +1,48 @@
-# Getting Started with Create React App
+# Miniature Storage Inlay Generator
 
-This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+A web app for generating 3D-printable storage inlays for miniature figures. Configure the dimensions of your container (Gridfinity bins or custom), add sections with different base hole sizes, and export the model as an STL file ready for slicing.
 
-## Available Scripts
+Live at: https://xfxian.github.io/ministoregen
 
-In the project directory, you can run:
+## Features
 
-### `npm start`
+- **Inlay configuration**: Set length, width, corner radius, depth, margin, and printing clearance
+- **Gridfinity mode**: Select standard Gridfinity bin dimensions by unit count
+- **Multi-section support**: Divide the inlay into sections with different hole sizes (e.g. 25mm and 32mm bases side-by-side)
+- **Hexagonal packing**: Holes are automatically laid out in a hex grid for maximum density
+- **Bezier ellipse holes**: Configurable curvature factor for a precise fit
+- **3D preview**: Interactive Three.js viewport with color picker and wireframe mode
+- **STL export**: Download the model for direct use in your slicer
 
-Runs the app in the development mode.\
-Open [http://localhost:3000](http://localhost:3000) to view it in your browser.
+## Tech stack
 
-The page will reload when you make changes.\
-You may also see any lint errors in the console.
+- [React](https://react.dev/) + [Vite](https://vite.dev/)
+- [Three.js](https://threejs.org/) via [@react-three/fiber](https://r3f.docs.pmnd.rs/) and [@react-three/drei](https://github.com/pmndrs/drei)
+- [Material UI](https://mui.com/)
+- [three-stdlib](https://github.com/pmndrs/three-stdlib) for STL export
 
-### `npm test`
+## Development
 
-Launches the test runner in the interactive watch mode.\
-See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
+```sh
+npm install
+npm run dev       # dev server at http://localhost:5173
+npm run build     # production build to dist/
+npm run preview   # serve the production build locally
+npm test          # run tests (vitest)
+npm run lint      # lint with ESLint
+```
 
-### `npm run build`
+## Project structure
 
-Builds the app for production to the `build` folder.\
-It correctly bundles React in production mode and optimizes the build for the best performance.
+```
+src/
+  App.jsx          # main component: state, UI controls, STL export
+  ModelPreview.jsx # Three.js canvas setup (lights, camera, grid)
+  Inlay.jsx        # 3D geometry: rounded rect, bezier ellipse, hex layout
+  config.js        # shared constants (defaults, Gridfinity dimensions, base sizes)
+  setupTests.js    # vitest/jest-dom setup
+```
 
-The build is minified and the filenames include the hashes.\
-Your app is ready to be deployed!
+## CI/CD
 
-See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
-
-### `npm run eject`
-
-**Note: this is a one-way operation. Once you `eject`, you can't go back!**
-
-If you aren't satisfied with the build tool and configuration choices, you can `eject` at any time. This command will remove the single build dependency from your project.
-
-Instead, it will copy all the configuration files and the transitive dependencies (webpack, Babel, ESLint, etc) right into your project so you have full control over them. All of the commands except `eject` will still work, but they will point to the copied scripts so you can tweak them. At this point you're on your own.
-
-You don't have to ever use `eject`. The curated feature set is suitable for small and middle deployments, and you shouldn't feel obligated to use this feature. However we understand that this tool wouldn't be useful if you couldn't customize it when you are ready for it.
-
-## Learn More
-
-You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
-
-To learn React, check out the [React documentation](https://reactjs.org/).
-
-### Code Splitting
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/code-splitting](https://facebook.github.io/create-react-app/docs/code-splitting)
-
-### Analyzing the Bundle Size
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size](https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size)
-
-### Making a Progressive Web App
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app](https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app)
-
-### Advanced Configuration
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/advanced-configuration](https://facebook.github.io/create-react-app/docs/advanced-configuration)
-
-### Deployment
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/deployment](https://facebook.github.io/create-react-app/docs/deployment)
-
-### `npm run build` fails to minify
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify](https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify)
+Pushes to `main` trigger a GitHub Actions workflow that lints, tests, builds, and deploys to GitHub Pages automatically.

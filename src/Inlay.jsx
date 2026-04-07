@@ -21,22 +21,6 @@ function roundedRect(length, width, cornerRadius) {
     return shape;
 }
 
-// /**
-//  * @param {number} x - The x-coordinate of the ellipse center.
-//  * @param {number} y - The y-coordinate of the ellipse center.
-//  * @param {number} radiusX - The horizontal radius of the ellipse.
-//  * @param {number} radiusY - The vertical radius of the ellipse.
-//  * @returns {THREE.Shape} - The generated ellipse shape.
-//  */
-// function ellipse(x, y, radiusX, radiusY) {
-//     const hole = new THREE.Shape();
-
-//     // Create an absolute ellipse path
-//     hole.absellipse(x, y, radiusX, radiusY, 0, Math.PI * 2, false);
-
-//     return hole;
-// }
-
 /**
  * @param {number} x - The x-coordinate of the ellipse center.
  * @param {number} y - The y-coordinate of the ellipse center.
@@ -107,10 +91,7 @@ function hexagonalLayout(length, width, margin, baseSizeX, baseSizeY, baseSpacin
     const xOffset = (usableWidth - patternWidth) / 2 + sectionXOffset;
     const yOffset = (usableLength - patternHeight) / 2 + sectionYOffset;
 
-    console.debug(`Rows: ${numRows}, Columns: ${numCols}`)
-
     if (numCols === 1) {
-        console.debug("Special handling for single column");
         // Recalculate row height for single column
         const singleColumnRowHeight = holeDiameterY + (baseSpacing / 2)
         const singleColumnNumRows = Math.floor(usableLength / singleColumnRowHeight);
@@ -138,8 +119,6 @@ function hexagonalLayout(length, width, margin, baseSizeX, baseSizeY, baseSpacin
         }
     }
 
-    console.debug(`Holes: ${holes.length}`)
-
     return holes;
 }
 
@@ -154,22 +133,15 @@ function Inlay({ modelRef, modelConfig, previewConfig }) {
     const inlayShape = roundedRect(lengthWithClearance, widthWithClearance, inlay.cornerRadius);
 
     base.sections.flatMap((section, index) => {
-        console.debug(`Section #${index + 1}`);
         const lengthWithClearanceAndMargin = lengthWithClearance - inlay.margin * 2;
-        console.debug(`Length with clearance ${lengthWithClearance} and margin ${lengthWithClearanceAndMargin}`);
-        console.debug(`Base share: ${section.share}`);
         const lengthWithShare = (section.share * lengthWithClearanceAndMargin) / 100;
-        console.debug(`Length with share ${lengthWithShare}`);
         const accumulatedYPercentage = base.sections
-            .map((section, index) => { console.log(`Section ${index}: ${section.share}`); return section.share })
-            .reduce((prev, curr, i) => { console.log(`Prev ${prev}`); return (i < index ? prev + curr : prev) }, 0);
+            .map(s => s.share)
+            .reduce((prev, curr, i) => (i < index ? prev + curr : prev), 0);
         const accumulatedYOffset = (accumulatedYPercentage * lengthWithClearanceAndMargin) / 100;
-        console.debug(`Accumulated Y Percentage: ${accumulatedYPercentage}, Offset: ${accumulatedYOffset}`);
-
         const sectionYOffset = (-lengthWithClearanceAndMargin / 2) + accumulatedYOffset + (lengthWithShare / 2);
 
-        const widthWithshare = widthWithClearance
-        const holePositions = hexagonalLayout(lengthWithShare, widthWithshare, inlay.margin, section.sizeX, section.sizeY, section.spacing, section.clearance, 0, sectionYOffset)
+        const holePositions = hexagonalLayout(lengthWithShare, widthWithClearance, inlay.margin, section.sizeX, section.sizeY, section.spacing, section.clearance, 0, sectionYOffset);
         inlayShape.holes = inlayShape.holes.concat(holePositions.map(([x, y]) => bezierEllipse(x, y, (section.sizeX / 2) + (section.clearance / 2), (section.sizeY / 2) + (section.clearance / 2), section.curvatureFactor)));
         return holePositions;
     });
@@ -181,11 +153,6 @@ function Inlay({ modelRef, modelConfig, previewConfig }) {
     const marginShape = roundedRect(lengthWithClearance - (inlay.margin * 2), widthWithClearance - (inlay.margin * 2), inlay.cornerRadius);
     const marginGeometry = new THREE.BufferGeometry().setFromPoints(marginShape.getPoints());
 
-    // const spacingGeometries = holePositions.map(([x, y]) => {
-    //     const spacingShape = circle(x, y, (base.size / 2) + (base.spacing / 2))
-    //     return new THREE.BufferGeometry().setFromPoints(spacingShape.getPoints(64));
-    // });
-
     return (
         <group>
             <mesh ref={modelRef} position={[0, 0, 0]}>
@@ -195,11 +162,6 @@ function Inlay({ modelRef, modelConfig, previewConfig }) {
             <line geometry={marginGeometry} position={[0, 0, inlay.depth + 0.1]}>
                 <lineDashedMaterial color={'blue'} dashSize={20} gapSize={5} linewidth={1} />
             </line>
-            {/* {spacingGeometries.map(spacingGeometry => (
-                <line geometry={spacingGeometry} position={[0, 0, inlay.depth + 0.1]}>
-                    <lineDashedMaterial color={'green'} />
-                </line>
-            ))} */}
         </group>
     );
 }

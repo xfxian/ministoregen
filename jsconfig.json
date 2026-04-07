@@ -1,7 +1,6 @@
 {
     "compilerOptions": {
-        "baseUrl": "src",
-        "module": "CommonJS",
+        "module": "ESNext",
         "jsx": "preserve",
         "checkJs": true
     },
