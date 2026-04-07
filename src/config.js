@@ -21,7 +21,16 @@ export const DEFAULT_INLAY = {
 // Note: every bin manufacturer is slightly different; these values are a common baseline.
 const GRIDFINITY_UNIT = 42;
 const GRIDFINITY_SPACER = 0.5;
-const GRIDFINITY_WALL_THICKNESS = 1.8;
+export const GRIDFINITY_WALL_THICKNESS = 1.8;
+export const GRIDFINITY_HEIGHT_UNIT = 7; // mm per gridfinity height unit
+
+export const DEFAULT_BIN_CONFIG = {
+  enabled: false,
+  wallThickness: 1.8,
+  floorThickness: 1.2,
+  heightMm: 28, // 4 gridfinity height units
+  stackingLip: true,
+};
 
 export const GRIDFINITY_DIMENSION_OPTIONS = [1, 2, 3, 4, 5, 6, 7, 8].map(n => [
   (n * GRIDFINITY_UNIT) - GRIDFINITY_SPACER - (2 * GRIDFINITY_WALL_THICKNESS),

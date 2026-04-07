@@ -1,4 +1,4 @@
-import { CircleOutlined, CropPortrait, Download, ExpandMore, Preview } from '@mui/icons-material';
+import { CircleOutlined, CropPortrait, Download, ExpandMore, Inventory2Outlined, Preview } from '@mui/icons-material';
 import {
   Accordion,
   AccordionActions,
@@ -28,10 +28,11 @@ import {
   Typography
 } from '@mui/material';
 import { createTheme, ThemeProvider } from '@mui/material/styles';
-import { DRAWER_WIDTH, DEFAULT_SECTION, DEFAULT_INLAY, SELECT_ITEMS } from './config';
+import { DRAWER_WIDTH, DEFAULT_SECTION, DEFAULT_INLAY, DEFAULT_BIN_CONFIG, GRIDFINITY_HEIGHT_UNIT, SELECT_ITEMS } from './config';
 import ModelPreview from './ModelPreview';
 import { useRef, useState } from 'react';
 import { STLExporter } from 'three-stdlib';
+import { Mesh } from 'three';
 import './App.css';
 
 function App() {
@@ -85,6 +86,13 @@ function App() {
       return { ...section, share: (section.share / (totalShares - skipSectionShare)) * (100 - skipSectionShare) };
     });
   }
+
+  const [binConfig, setBinConfig] = useState({ ...DEFAULT_BIN_CONFIG });
+  const [binHeightUnit, setBinHeightUnit] = useState('mm');
+
+  const handleBinConfigChange = (field, value) => {
+    setBinConfig((prev) => ({ ...prev, [field]: value }));
+  };
 
   const [previewConfig, setPreviewConfig] = useState({
     wireframe: false,
@@ -170,31 +178,32 @@ function App() {
   // State variable for controlling the modal alert
   const [openAlert, setOpenAlert] = useState(false);
 
-  // Ref to access the mesh
+  // Refs to access meshes
   const modelRef = useRef();
+  const binRef = useRef();
 
-  // Export function
-  const handleExport = () => {
-    const exporter = new STLExporter();
-    const mesh = modelRef.current;
-
+  const exportMesh = (meshRef, filename) => {
+    const mesh = meshRef.current;
     if (!mesh) {
       setOpenAlert(true);
-      return;
+      return false;
     }
-
-    // Ensure the mesh's world matrix is up-to-date
-    // @ts-ignore
-    mesh.updateMatrixWorld(true);
-
-    const stlBinary = exporter.parse(mesh, { binary: true });
-
-    // Create and download the STL file
+    const tempMesh = new Mesh(mesh.geometry);
+    const stlBinary = new STLExporter().parse(tempMesh, { binary: true });
     const blob = new Blob([stlBinary], { type: 'application/octet-stream' });
     const link = document.createElement('a');
     link.href = URL.createObjectURL(blob);
-    link.download = 'model.stl';
+    link.download = filename;
     link.click();
+    return true;
+  };
+
+  const handleExportInlay = () => exportMesh(modelRef, 'inlay.stl');
+  const handleExportBin = () => exportMesh(binRef, 'bin.stl');
+  const handleExportBoth = () => {
+    if (exportMesh(modelRef, 'inlay.stl')) {
+      setTimeout(() => exportMesh(binRef, 'bin.stl'), 100);
+    }
   };
   // Function to handle closing the modal alert
   const handleCloseAlert = () => {
@@ -210,9 +219,17 @@ function App() {
             <Typography variant="h5" noWrap component="div" style={{ flexGrow: 1 }}>
               Miniature Storage Inlay Generator
             </Typography>
-            <Button variant='outlined' color="inherit" startIcon={<Download />} onClick={handleExport}>
-              Download STL
-            </Button>
+            <Stack direction="row" spacing={1}>
+              <Button variant='outlined' color="inherit" startIcon={<Download />} onClick={handleExportInlay}>
+                Download Inlay
+              </Button>
+              <Button variant='outlined' color="inherit" startIcon={<Download />} onClick={handleExportBin} disabled={!binConfig.enabled}>
+                Download Bin
+              </Button>
+              <Button variant='outlined' color="inherit" startIcon={<Download />} onClick={handleExportBoth} disabled={!binConfig.enabled}>
+                Download Both
+              </Button>
+            </Stack>
           </Toolbar>
         </AppBar>
 
@@ -334,6 +351,102 @@ function App() {
 
             <Accordion>
               <AccordionSummary expandIcon={<ExpandMore />}>
+                <Stack direction="row" alignItems="center" spacing={0.5}>
+                  <Inventory2Outlined />
+                  <span>Bin</span>
+                  {binConfig.enabled && <Chip label="Enabled" color="primary" size="small" variant="outlined" />}
+                </Stack>
+              </AccordionSummary>
+              <AccordionDetails>
+                <Box sx={{ marginBottom: 1 }}>
+                  <FormControlLabel
+                    control={
+                      <Switch
+                        checked={binConfig.enabled}
+                        onChange={(e) => handleBinConfigChange('enabled', e.target.checked)}
+                        color="primary"
+                      />
+                    }
+                    label="Generate Gridfinity Bin"
+                  />
+                </Box>
+
+                <Grid container spacing={2} sx={{ opacity: binConfig.enabled ? 1 : 0.4, pointerEvents: binConfig.enabled ? 'auto' : 'none' }}>
+                  <Grid size={6}>
+                    <TextField
+                      label="Wall Thickness"
+                      helperText="Thickness of bin walls"
+                      type="number"
+                      value={binConfig.wallThickness}
+                      onChange={(e) => handleBinConfigChange('wallThickness', parseFloat(e.target.value) || 0)}
+                      fullWidth
+                      margin="normal"
+                      variant="standard"
+                      slotProps={{ input: { endAdornment: <InputAdornment position="end">mm</InputAdornment> } }}
+                    />
+                  </Grid>
+                  <Grid size={6}>
+                    <TextField
+                      label="Floor Thickness"
+                      helperText="Thickness of bin floor"
+                      type="number"
+                      value={binConfig.floorThickness}
+                      onChange={(e) => handleBinConfigChange('floorThickness', parseFloat(e.target.value) || 0)}
+                      fullWidth
+                      margin="normal"
+                      variant="standard"
+                      slotProps={{ input: { endAdornment: <InputAdornment position="end">mm</InputAdornment> } }}
+                    />
+                  </Grid>
+                  <Grid size={12}>
+                    <ToggleButtonGroup
+                      exclusive
+                      value={binHeightUnit}
+                      fullWidth
+                      onChange={(e, value) => {
+                        if (!value) return;
+                        setBinHeightUnit(value);
+                        if (value === 'u') {
+                          handleBinConfigChange('heightMm', Math.round(binConfig.heightMm / GRIDFINITY_HEIGHT_UNIT) * GRIDFINITY_HEIGHT_UNIT || GRIDFINITY_HEIGHT_UNIT);
+                        }
+                      }}
+                    >
+                      <ToggleButton value="mm">mm</ToggleButton>
+                      <ToggleButton value="u">Gridfinity units</ToggleButton>
+                    </ToggleButtonGroup>
+                    <TextField
+                      label="Bin Height"
+                      helperText={binHeightUnit === 'u' ? `1 unit = ${GRIDFINITY_HEIGHT_UNIT}mm` : 'Total bin height including floor'}
+                      type="number"
+                      value={binHeightUnit === 'u' ? Math.round(binConfig.heightMm / GRIDFINITY_HEIGHT_UNIT) : binConfig.heightMm}
+                      onChange={(e) => {
+                        const v = parseFloat(e.target.value) || 0;
+                        handleBinConfigChange('heightMm', binHeightUnit === 'u' ? v * GRIDFINITY_HEIGHT_UNIT : v);
+                      }}
+                      fullWidth
+                      margin="normal"
+                      variant="standard"
+                      slotProps={{ input: { endAdornment: <InputAdornment position="end">{binHeightUnit}</InputAdornment> } }}
+                    />
+                  </Grid>
+                  <Grid size={12}>
+                    <FormControlLabel
+                      control={
+                        <Switch
+                          checked={binConfig.stackingLip}
+                          onChange={(e) => handleBinConfigChange('stackingLip', e.target.checked)}
+                          color="primary"
+                        />
+                      }
+                      label="Stacking Lip"
+                    />
+                  </Grid>
+                </Grid>
+              </AccordionDetails>
+            </Accordion>
+
+            <Accordion>
+              <AccordionSummary expandIcon={<ExpandMore />}>
                 <Preview sx={{ marginRight: 0.5 }} />Preview
               </AccordionSummary>
               <AccordionDetails>
@@ -392,7 +505,9 @@ function App() {
         <div className="canvas-container">
           <ModelPreview
             modelRef={modelRef}
+            binRef={binRef}
             modelConfig={modelConfig}
+            binConfig={binConfig}
             previewConfig={previewConfig}
           />
         </div>

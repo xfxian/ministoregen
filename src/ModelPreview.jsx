@@ -1,8 +1,9 @@
 import { Grid, CameraControls } from '@react-three/drei';
 import { Canvas } from '@react-three/fiber';
-import Inlay from './Inlay'; // Ensure correct relative path
+import Inlay from './Inlay';
+import Bin from './Bin';
 
-function ModelPreview({ modelRef, modelConfig, previewConfig }) {
+function ModelPreview({ modelRef, binRef, modelConfig, binConfig, previewConfig }) {
     return (
         <Canvas shadows camera={{ position: [75, 75, 75] }}>
             <Grid
@@ -18,6 +19,9 @@ function ModelPreview({ modelRef, modelConfig, previewConfig }) {
             <pointLight position={[75, 150, -75]} intensity={3} decay={0.1} color={'white'} />
 
             <group rotation={[Math.PI / 2, Math.PI, 0]}>
+                {binConfig.enabled && (
+                    <Bin binRef={binRef} binConfig={binConfig} modelConfig={modelConfig} previewConfig={previewConfig} />
+                )}
                 <Inlay modelRef={modelRef} modelConfig={modelConfig} previewConfig={previewConfig} />
             </group>
 
