@@ -8,11 +8,10 @@ function SectionViz({ sections, selectedSection, onSelectSection }) {
 
   const totalShare = sections.reduce((sum, s) => sum + s.share, 0);
 
-  let accumulated = 0;
   const strips = sections.map((section, i) => {
-    const x = (accumulated / totalShare) * 100;
+    const accumulatedShare = sections.slice(0, i).reduce((sum, s) => sum + s.share, 0);
+    const x = (accumulatedShare / totalShare) * 100;
     const w = (section.share / totalShare) * 100;
-    accumulated += section.share;
     return { index: i, x, w, share: section.share };
   });
 

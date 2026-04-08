@@ -60,7 +60,7 @@ function TabPanel({ children, value, index }) {
   ) : null;
 }
 
-function FieldGrid({ entries, onChange, mode, isSelectItem, isMode, modeKey, step, labelMap }) {
+function FieldGrid({ entries, onChange, isSelectItem, isMode, modeKey, step, labelMap }) {
   return (
     <Grid container spacing={1.5}>
       {entries.map(([key, value]) => (
