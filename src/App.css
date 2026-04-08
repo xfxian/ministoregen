@@ -13,3 +13,11 @@
   width: 100%;
   height: 100%;
 }
+
+/* Mobile: canvas fills full viewport, sidebar is a temporary overlay */
+@media (max-width: 900px) {
+  .canvas-container {
+    width: 100vw;
+    height: 100vh;
+  }
+}
