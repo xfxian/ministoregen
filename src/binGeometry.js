@@ -91,8 +91,9 @@ function buildTaperedRoundedRectGeometry(botL, botW, botR, topL, topW, topR, hei
     for (let i = 0; i < N; i++) {
         const b0 = i * 2, t0 = b0 + 1;
         const b1 = (i + 1) * 2, t1 = b1 + 1;
-        indices.push(b0, b1, t0);
-        indices.push(b1, t1, t0);
+        // roundedRectShape traces CW, so winding must be (b0,t0,b1) for outward normals
+        indices.push(b0, t0, b1);
+        indices.push(b1, t0, t1);
     }
 
     const geo = new THREE.BufferGeometry();

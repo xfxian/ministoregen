@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import * as THREE from 'three';
 import {
     buildBinGeometry,
     buildBaseFootsGeometry,
@@ -81,6 +82,37 @@ describe('buildBaseFootsGeometry', () => {
         expect(geo).not.toBeNull();
         const [minZ] = zRange(geo);
         expect(minZ).toBeCloseTo(0, 1);
+    });
+
+    it('all side face normals point outward (no backface culling issues)', () => {
+        // Use a single 1×1 unit foot (outerSize = 41.5mm) so the foot center is at (0,0)
+        // and outward direction is simply away from the origin in XY.
+        const outerSize = 41.5; // exactly 1 gridfinity unit outer
+        const geo = buildBaseFootsGeometry(outerSize, outerSize);
+        expect(geo).not.toBeNull();
+
+        const pos = geo.getAttribute('position');
+        let inwardCount = 0;
+        const triCount = pos.count / 3;
+        for (let t = 0; t < triCount; t++) {
+            const i = t * 3;
+            const a = new THREE.Vector3(pos.getX(i), pos.getY(i), pos.getZ(i));
+            const b = new THREE.Vector3(pos.getX(i + 1), pos.getY(i + 1), pos.getZ(i + 1));
+            const c = new THREE.Vector3(pos.getX(i + 2), pos.getY(i + 2), pos.getZ(i + 2));
+            const n = new THREE.Vector3()
+                .crossVectors(
+                    new THREE.Vector3().subVectors(b, a),
+                    new THREE.Vector3().subVectors(c, a)
+                )
+                .normalize();
+            // Skip cap faces (near-horizontal)
+            if (Math.abs(n.z) > 0.9) continue;
+            // Face center — for a single centered foot, outward = away from origin in XY
+            const mid = new THREE.Vector3().addVectors(a, b).add(c).multiplyScalar(1 / 3);
+            const outward = new THREE.Vector3(mid.x, mid.y, 0).normalize();
+            if (n.dot(outward) < 0) inwardCount++;
+        }
+        expect(inwardCount).toBe(0);
     });
 });
 
