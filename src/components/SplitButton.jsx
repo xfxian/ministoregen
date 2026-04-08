@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useCallback } from 'react';
 import {
   Button,
   ButtonGroup,
@@ -13,11 +13,12 @@ import { ArrowDropDown, Download } from '@mui/icons-material';
 
 function SplitButton({ onDownloadAll, onDownloadBin, onDownloadInlay, binEnabled }) {
   const [open, setOpen] = useState(false);
-  const anchorRef = useRef(null);
+  const [anchorEl, setAnchorEl] = useState(null);
+  const anchorRef = useCallback((node) => setAnchorEl(node), []);
 
   const handleToggle = () => setOpen((prev) => !prev);
   const handleClose = (event) => {
-    if (anchorRef.current && anchorRef.current.contains(event.target)) return;
+    if (anchorEl && anchorEl.contains(event.target)) return;
     setOpen(false);
   };
 
@@ -31,7 +32,7 @@ function SplitButton({ onDownloadAll, onDownloadBin, onDownloadInlay, binEnabled
           <ArrowDropDown />
         </Button>
       </ButtonGroup>
-      <Popper open={open} anchorEl={anchorRef.current} transition disablePortal placement="bottom-end" style={{ zIndex: 1300 }}>
+      <Popper open={open} anchorEl={anchorEl} transition disablePortal placement="bottom-end" style={{ zIndex: 1300 }}>
         {({ TransitionProps }) => (
           <Grow {...TransitionProps}>
             <Paper>
