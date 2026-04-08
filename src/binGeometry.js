@@ -164,7 +164,10 @@ export function buildBaseFootsGeometry(outerL, outerW) {
             geos.push(footClone);
         }
     }
-    return mergeGeometries(geos);
+    // Convert to non-indexed to match ExtrudeGeometry (floor/walls) which is also non-indexed.
+    // mergeGeometries requires all inputs to have the same index status.
+    const merged = mergeGeometries(geos);
+    return merged ? merged.toNonIndexed() : null;
 }
 
 /**
