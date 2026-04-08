@@ -7,5 +7,5 @@ vi.mock('three-stdlib', () => ({ STLExporter: vi.fn(() => ({ parse: vi.fn() })) 
 
 test('renders app bar title', () => {
   render(<App />);
-  expect(screen.getByText(/Miniature Storage Inlay Generator/i)).toBeInTheDocument();
+  expect(screen.getByText(/Miniature Storage Generator/i)).toBeInTheDocument();
 });

@@ -1,4 +1,4 @@
-import { CircleOutlined, CropPortrait, Download, ExpandMore, Inventory2Outlined, Preview } from '@mui/icons-material';
+import { CircleOutlined, CropPortrait, ExpandMore, Inventory2Outlined, Preview } from '@mui/icons-material';
 import {
   Accordion,
   AccordionActions,
@@ -31,6 +31,8 @@ import {
 import { createTheme, ThemeProvider } from '@mui/material/styles';
 import { DRAWER_WIDTH, DEFAULT_SECTION, DEFAULT_INLAY, DEFAULT_BIN_CONFIG, GRIDFINITY_HEIGHT_UNIT, SELECT_ITEMS } from './config';
 import ModelPreview from './ModelPreview';
+import SplitButton from './components/SplitButton';
+import NumberInput from './components/NumberInput';
 import { useRef, useState } from 'react';
 import { STLExporter } from 'three-stdlib';
 import { Mesh } from 'three';
@@ -218,19 +220,14 @@ function App() {
         <AppBar position="fixed" sx={{ zIndex: (theme) => theme.zIndex.drawer + 1 }}>
           <Toolbar>
             <Typography variant="h5" noWrap component="div" style={{ flexGrow: 1 }}>
-              Miniature Storage Inlay Generator
+              Miniature Storage Generator
             </Typography>
-            <Stack direction="row" spacing={1}>
-              <Button variant='outlined' color="inherit" startIcon={<Download />} onClick={handleExportInlay}>
-                Download Inlay
-              </Button>
-              <Button variant='outlined' color="inherit" startIcon={<Download />} onClick={handleExportBin} disabled={!binConfig.enabled}>
-                Download Bin
-              </Button>
-              <Button variant='outlined' color="inherit" startIcon={<Download />} onClick={handleExportBoth} disabled={!binConfig.enabled}>
-                Download Both
-              </Button>
-            </Stack>
+            <SplitButton
+              onDownloadAll={handleExportBoth}
+              onDownloadBin={handleExportBin}
+              onDownloadInlay={handleExportInlay}
+              binEnabled={binConfig.enabled}
+            />
           </Toolbar>
         </AppBar>
 
@@ -242,17 +239,18 @@ function App() {
             [`& .MuiDrawer-paper`]: {
               width: DRAWER_WIDTH,
               boxSizing: 'border-box',
-              overflowX: 'hidden'
+              overflowX: 'hidden',
+              overflowY: 'auto',
             },
           }}
         >
           <Toolbar />
           <Box
-            sx={{ width: DRAWER_WIDTH, padding: 2, backgroundColor: 'background.default' }}
+            sx={{ width: DRAWER_WIDTH, padding: 2, pt: 3, backgroundColor: 'background.default' }}
           >
             <Accordion defaultExpanded>
               <AccordionSummary expandIcon={<ExpandMore />}>
-                <CropPortrait sx={{ marginRight: 0.5 }} /><span>Inlay</span>
+                <CropPortrait sx={{ marginRight: 0.5 }} /><span style={{ fontWeight: 600 }}>Inlay</span>
               </AccordionSummary>
               <AccordionDetails>
                 <ToggleButtonGroup exclusive value={inlayMode} fullWidth onChange={(e, value) => setInlayMode(value)}>
@@ -260,23 +258,23 @@ function App() {
                   <ToggleButton value="custom">Custom</ToggleButton>
                 </ToggleButtonGroup>
 
-                <Grid container spacing={2}>
+                <Grid container spacing={2} sx={{ mt: 1 }}>
                   {Object.entries(modelConfig.inlay).map(([key, value]) =>
                   (
                     <Grid size={6} key={`grid-inlay-${key}`}>
-                      <TextField
+                      <NumberInput
                         label={labels.modelConfig.inlay[key]?.label || key}
                         helperText={labels.modelConfig.inlay[key]?.help}
-                        type="number"
                         value={value}
                         onChange={(e) => handleInlayConfigChange(key, parseFloat(e.target.value) || 0)}
                         fullWidth
                         margin="normal"
-                        variant="standard"
+                        step={0.1}
+                        unit={isGridfinityMode && isSelectItem("gridfinity", key) ? SELECT_ITEMS['gridfinity'][key].unit : 'mm'}
                         select={isGridfinityMode && isSelectItem("gridfinity", key)}
                         slotProps={{
                           input: {
-                            endAdornment: <InputAdornment position="end" sx={{ marginRight: isGridfinityMode && isSelectItem("gridfinity", key) ? 3 : 0 }}>{isGridfinityMode && isSelectItem("gridfinity", key) ? SELECT_ITEMS['gridfinity'][key].unit : 'mm'}</InputAdornment>
+                            endAdornment: <InputAdornment position="end" sx={{ marginRight: 3 }}>{SELECT_ITEMS['gridfinity'][key]?.unit}</InputAdornment>
                           }
                         }}
                       >
@@ -285,7 +283,7 @@ function App() {
                             <MenuItem key={`inlay-${key}-${value}`} value={value}>{description}</MenuItem>
                           ))
                         )}
-                      </TextField>
+                      </NumberInput>
                     </Grid>
                   )
                   )}
@@ -294,12 +292,12 @@ function App() {
             </Accordion>
 
             {modelConfig.base.sections.map((section, sectionIndex) => (
-              <Accordion defaultExpanded key={`section-${sectionIndex}`}>
+              <Accordion defaultExpanded key={`section-${sectionIndex}`} sx={{ '&:before': { display: 'none' }, border: 1, borderColor: 'divider', borderRadius: 1 }}>
                 <AccordionSummary expandIcon={<ExpandMore />}>
                   <Stack direction="row" alignItems="center" spacing={1}>
                     <Stack direction="row" alignItems="center" spacing={0.5}>
                       <CircleOutlined />
-                      <span>Base</span>
+                      <span style={{ fontWeight: 600 }}>Base</span>
                     </Stack>
                     <Chip label={`Section ${sectionIndex + 1}`} variant="outlined" color="primary" />
                   </Stack>
@@ -310,23 +308,23 @@ function App() {
                     <ToggleButton value="custom">Custom</ToggleButton>
                   </ToggleButtonGroup>
 
-                  <Grid container spacing={2}>
+                  <Grid container spacing={2} sx={{ mt: 1 }}>
                     {Object.entries(section).map(([key, value]) =>
                     (
                       <Grid size={6} sx={{ marginBottom: 0 }} key={`box-base-${key}`}>
-                        <TextField
+                        <NumberInput
                           label={labels.modelConfig.base[key]?.label || key}
                           helperText={labels.modelConfig.base[key]?.help}
-                          type="number"
                           value={value}
                           onChange={(e) => handleBaseSectionConfigChange(sectionIndex, key, parseFloat(e.target.value) || 0)}
                           fullWidth
                           margin="normal"
-                          variant="standard"
+                          step={0.1}
+                          unit={is40kMode && isSelectItem("40k", key) ? SELECT_ITEMS['40k'][key].unit : (labels.modelConfig.base[key]?.unit || 'mm')}
                           select={is40kMode && isSelectItem("40k", key)}
                           slotProps={{
                             input: {
-                              endAdornment: <InputAdornment position="end" sx={{ marginRight: is40kMode && isSelectItem("40k", key) ? 3 : 0 }}>{is40kMode && isSelectItem("40k", key) ? SELECT_ITEMS['40k'][key].unit : (labels.modelConfig.base[key]?.unit || 'mm')}</InputAdornment>
+                              endAdornment: <InputAdornment position="end" sx={{ marginRight: 3 }}>{SELECT_ITEMS['40k'][key]?.unit}</InputAdornment>
                             }
                           }}
                         >
@@ -335,7 +333,7 @@ function App() {
                               <MenuItem key={`base-${key}-${value}`} value={value}>{description}</MenuItem>
                             ))
                           )}
-                        </TextField>
+                        </NumberInput>
                       </Grid>
                     )
                     )}
@@ -345,58 +343,58 @@ function App() {
                   {(sectionIndex === (modelConfig.base.sections.length - 1) && (
                     <Button onClick={() => handleBaseSectionAdd(sectionIndex)}>Add</Button>
                   ))}
-                  <Button onClick={() => handleBaseSectionRemove(sectionIndex)}>Remove</Button>
+                  <Button onClick={() => handleBaseSectionRemove(sectionIndex)} color="error">Remove</Button>
                 </AccordionActions>
               </Accordion>
             ))}
 
             <Accordion>
-              <AccordionSummary expandIcon={<ExpandMore />}>
-                <Stack direction="row" alignItems="center" spacing={0.5}>
+              <AccordionSummary expandIcon={<ExpandMore />} onClick={(e) => e.stopPropagation()}>
+                <Stack direction="row" alignItems="center" spacing={0.5} sx={{ flex: 1 }}>
                   <Inventory2Outlined />
-                  <span>Bin</span>
-                  {binConfig.enabled && <Chip label="Enabled" color="primary" size="small" variant="outlined" />}
-                </Stack>
-              </AccordionSummary>
-              <AccordionDetails>
-                <Box sx={{ marginBottom: 1 }}>
+                  <span style={{ fontWeight: 600, flexGrow: 1 }}>Bin</span>
                   <FormControlLabel
                     control={
                       <Switch
                         checked={binConfig.enabled}
-                        onChange={(e) => handleBinConfigChange('enabled', e.target.checked)}
+                        onChange={(e) => { e.stopPropagation(); handleBinConfigChange('enabled', e.target.checked); }}
                         color="primary"
+                        size="small"
                       />
                     }
-                    label="Generate Gridfinity Bin"
+                    label={binConfig.enabled ? 'On' : 'Off'}
+                    labelPlacement="start"
+                    onClick={(e) => e.stopPropagation()}
+                    sx={{ mr: 0, ml: 'auto' }}
                   />
-                </Box>
-
+                </Stack>
+              </AccordionSummary>
+              <AccordionDetails>
                 <Grid container spacing={2} sx={{ opacity: binConfig.enabled ? 1 : 0.4, pointerEvents: binConfig.enabled ? 'auto' : 'none' }}>
                   <Grid size={6}>
-                    <TextField
+                    <NumberInput
                       label="Wall Thickness"
                       helperText="Thickness of bin walls"
-                      type="number"
                       value={binConfig.wallThickness}
                       onChange={(e) => handleBinConfigChange('wallThickness', parseFloat(e.target.value) || 0)}
                       fullWidth
                       margin="normal"
-                      variant="standard"
-                      slotProps={{ input: { endAdornment: <InputAdornment position="end">mm</InputAdornment> } }}
+                      step={0.1}
+                      unit="mm"
+                      min={0.1}
                     />
                   </Grid>
                   <Grid size={6}>
-                    <TextField
+                    <NumberInput
                       label="Floor Thickness"
                       helperText="Thickness of bin floor"
-                      type="number"
                       value={binConfig.floorThickness}
                       onChange={(e) => handleBinConfigChange('floorThickness', parseFloat(e.target.value) || 0)}
                       fullWidth
                       margin="normal"
-                      variant="standard"
-                      slotProps={{ input: { endAdornment: <InputAdornment position="end">mm</InputAdornment> } }}
+                      step={0.1}
+                      unit="mm"
+                      min={0.1}
                     />
                   </Grid>
                   <Grid size={12}>
@@ -415,10 +413,9 @@ function App() {
                       <ToggleButton value="mm">mm</ToggleButton>
                       <ToggleButton value="u">Gridfinity units</ToggleButton>
                     </ToggleButtonGroup>
-                    <TextField
+                    <NumberInput
                       label="Bin Height"
                       helperText={binHeightUnit === 'u' ? `1 unit = ${GRIDFINITY_HEIGHT_UNIT}mm` : 'Total bin height including floor'}
-                      type="number"
                       value={binHeightUnit === 'u' ? Math.round(binConfig.heightMm / GRIDFINITY_HEIGHT_UNIT) : binConfig.heightMm}
                       onChange={(e) => {
                         const v = parseFloat(e.target.value) || 0;
@@ -426,8 +423,9 @@ function App() {
                       }}
                       fullWidth
                       margin="normal"
-                      variant="standard"
-                      slotProps={{ input: { endAdornment: <InputAdornment position="end">{binHeightUnit}</InputAdornment> } }}
+                      step={binHeightUnit === 'u' ? 1 : 0.5}
+                      unit={binHeightUnit}
+                      min={1}
                     />
                   </Grid>
                   <Grid size={12}>
@@ -440,6 +438,8 @@ function App() {
                         />
                       }
                       label="Stacking Lip"
+                      labelPlacement="start"
+                      sx={{ width: '100%', justifyContent: 'space-between', ml: 0 }}
                     />
                   </Grid>
                   <Grid size={12}>
@@ -453,6 +453,8 @@ function App() {
                         />
                       }
                       label="Gridfinity Base Feet"
+                      labelPlacement="start"
+                      sx={{ width: '100%', justifyContent: 'space-between', ml: 0 }}
                     />
                     {!isGridfinityMode && (
                       <FormHelperText>Only available when using Gridfinity units</FormHelperText>
@@ -464,7 +466,7 @@ function App() {
 
             <Accordion>
               <AccordionSummary expandIcon={<ExpandMore />}>
-                <Preview sx={{ marginRight: 0.5 }} />Preview
+                <Preview sx={{ marginRight: 0.5 }} /><span style={{ fontWeight: 600 }}>Preview</span>
               </AccordionSummary>
               <AccordionDetails>
                 {/* Color Picker */}
@@ -478,6 +480,23 @@ function App() {
                     slotProps={{ inputLabel: { shrink: true } }}
                     variant="outlined"
                   />
+                </Box>
+
+                {/* Corner Segments */}
+                <Box sx={{ marginBottom: 1 }}>
+                  <TextField
+                    select
+                    label="Corner Segments"
+                    value={binConfig.cornerSegments}
+                    onChange={(e) => handleBinConfigChange('cornerSegments', parseInt(e.target.value))}
+                    fullWidth
+                    variant="outlined"
+                    helperText="Higher values = smoother corners, slower render"
+                  >
+                    {[8, 16, 32, 64].map(n => (
+                      <MenuItem key={n} value={n}>{n}</MenuItem>
+                    ))}
+                  </TextField>
                 </Box>
 
                 {/* Wireframe Toggle */}
