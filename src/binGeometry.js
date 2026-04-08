@@ -78,9 +78,13 @@ function buildTaperedRoundedRectGeometry(botL, botW, botR, topL, topW, topR, hei
     const topPts = roundedRectShape(topL, topW, topR).getPoints(N);
 
     const verts = [];
+    const uvs = [];
     for (let i = 0; i <= N; i++) {
+        const u = i / N;
         verts.push(botPts[i].x, botPts[i].y, 0);
         verts.push(topPts[i].x, topPts[i].y, height);
+        uvs.push(u, 0);
+        uvs.push(u, 1);
     }
 
     const indices = [];
@@ -93,6 +97,7 @@ function buildTaperedRoundedRectGeometry(botL, botW, botR, topL, topW, topR, hei
 
     const geo = new THREE.BufferGeometry();
     geo.setAttribute('position', new THREE.Float32BufferAttribute(verts, 3));
+    geo.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
     geo.setIndex(indices);
     geo.computeVertexNormals();
     return geo;
