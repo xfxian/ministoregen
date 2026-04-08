@@ -122,7 +122,7 @@ function hexagonalLayout(length, width, margin, baseSizeX, baseSizeY, baseSpacin
     return holes;
 }
 
-function Inlay({ modelRef, modelConfig, previewConfig }) {
+function Inlay({ modelRef, modelConfig, previewConfig, binEnabled }) {
     const { inlay, base } = modelConfig;
 
     const lengthWithClearance = inlay.length - inlay.clearance;
@@ -155,7 +155,7 @@ function Inlay({ modelRef, modelConfig, previewConfig }) {
 
     return (
         <group>
-            <mesh ref={modelRef} position={[0, 0, 0]}>
+            <mesh ref={modelRef} position={[0, 0, binEnabled ? 0.01 : 0]}>
                 <extrudeGeometry args={[inlayShape, extrudeSettings]} />
                 <meshPhysicalMaterial wireframe={previewConfig.wireframe} color={previewConfig.color} clearcoat={0.5} clearcoatRoughness={0.4} reflectivity={0.25} />
             </mesh>

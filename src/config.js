@@ -31,6 +31,7 @@ export const DEFAULT_BIN_CONFIG = {
   heightMm: 28, // 4 gridfinity height units
   stackingLip: true,
   baseFeet: false,
+  cornerSegments: 32,
 };
 
 export const GRIDFINITY_DIMENSION_OPTIONS = [1, 2, 3, 4, 5, 6, 7, 8].map(n => [

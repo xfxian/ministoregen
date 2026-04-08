@@ -22,7 +22,7 @@ function ModelPreview({ modelRef, binRef, modelConfig, binConfig, previewConfig 
                 {binConfig.enabled && (
                     <Bin binRef={binRef} binConfig={binConfig} modelConfig={modelConfig} previewConfig={previewConfig} />
                 )}
-                <Inlay modelRef={modelRef} modelConfig={modelConfig} previewConfig={previewConfig} />
+                <Inlay modelRef={modelRef} modelConfig={modelConfig} previewConfig={previewConfig} binEnabled={binConfig.enabled} />
             </group>
 
             <CameraControls makeDefault />

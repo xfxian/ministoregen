@@ -19,7 +19,6 @@ export const BASE_HEIGHT = BASE_BOTTOM_CHAMFER + BASE_VERTICAL + BASE_TOP_CHAMFE
 // Stacking lip dimensions (Gridfinity spec)
 // Profile: STACKING_LIP_LINE = [[0,0],[0.7,0.7],[0.7,2.5],[2.6,4.4]]
 // [inset_from_outer, height] at each keypoint
-const LIP_OUTER_CLEARANCE = 0.25;    // inset per side from bin outer
 const LIP_CHAMFER_BOT = 0.7;         // bottom chamfer: 0.7mm in × 0.7mm up (45°)
 const LIP_VERT = 1.8;                // vertical inner section height (2.5 - 0.7)
 const LIP_CHAMFER_TOP = 1.9;         // top chamfer height (4.4 - 2.5), same width (45°)
@@ -60,16 +59,16 @@ function roundedRectPath(length, width, cornerRadius) {
     return path;
 }
 
-export function buildFloorGeometry(outerL, outerW, cornerRadius, floorThickness) {
+export function buildFloorGeometry(outerL, outerW, cornerRadius, floorThickness, cornerSegments = 32) {
     const shape = roundedRectShape(outerL, outerW, cornerRadius);
-    const geo = new THREE.ExtrudeGeometry(shape, { depth: floorThickness, bevelEnabled: false });
+    const geo = new THREE.ExtrudeGeometry(shape, { depth: floorThickness, curveSegments: cornerSegments, bevelEnabled: false });
     return geo;
 }
 
-export function buildWallsGeometry(outerL, outerW, innerL, innerW, outerCornerRadius, innerCornerRadius, wallHeight) {
+export function buildWallsGeometry(outerL, outerW, innerL, innerW, outerCornerRadius, innerCornerRadius, wallHeight, cornerSegments = 32) {
     const shape = roundedRectShape(outerL, outerW, outerCornerRadius);
     shape.holes = [roundedRectPath(innerL, innerW, innerCornerRadius)];
-    const geo = new THREE.ExtrudeGeometry(shape, { depth: wallHeight, curveSegments: 32, bevelEnabled: false });
+    const geo = new THREE.ExtrudeGeometry(shape, { depth: wallHeight, curveSegments: cornerSegments, bevelEnabled: false });
     return geo;
 }
 
@@ -77,11 +76,10 @@ export function buildWallsGeometry(outerL, outerW, innerL, innerW, outerCornerRa
  * Builds the side surface (no caps) of a lofted solid between two rounded rectangles.
  * Bottom profile at Z=0, top profile at Z=height.
  */
-function buildTaperedRoundedRectGeometry(botL, botW, botR, topL, topW, topR, height, flipNormals = false) {
+function buildTaperedRoundedRectGeometry(botL, botW, botR, topL, topW, topR, height, flipNormals = false, N = 256) {
     // Use getSpacedPoints(N) — always returns exactly N+1 arc-length-uniform points,
     // with points[0] == points[N] (closing the ring), regardless of three.js version.
     // (getPoints(N) in three.js r170+ gives arcs N*2 samples each, far more than N+1.)
-    const N = 256;
     const botPts = roundedRectShape(botL, botW, botR).getSpacedPoints(N); // N+1 pts, [0]==[N]
     const topPts = roundedRectShape(topL, topW, topR).getSpacedPoints(N);
 
@@ -122,30 +120,31 @@ function buildTaperedRoundedRectGeometry(botL, botW, botR, topL, topW, topR, hei
  * Centered at origin, base at Z=0, top at Z=BASE_HEIGHT.
  * Top cap is intentionally omitted — the bin floor covers it at Z=BASE_HEIGHT.
  */
-export function buildSingleBaseFootGeometry() {
+export function buildSingleBaseFootGeometry(cornerSegments = 32) {
+    const N = cornerSegments * 8;
     // Side surfaces for 3 sections
     const sec1 = buildTaperedRoundedRectGeometry(
         FOOT_BOT_OUTER, FOOT_BOT_OUTER, FOOT_BOT_RADIUS,
         FOOT_MID_OUTER, FOOT_MID_OUTER, FOOT_MID_RADIUS,
-        BASE_BOTTOM_CHAMFER
+        BASE_BOTTOM_CHAMFER, false, N
     );
 
     const sec2 = buildTaperedRoundedRectGeometry(
         FOOT_MID_OUTER, FOOT_MID_OUTER, FOOT_MID_RADIUS,
         FOOT_MID_OUTER, FOOT_MID_OUTER, FOOT_MID_RADIUS,
-        BASE_VERTICAL
+        BASE_VERTICAL, false, N
     );
     sec2.applyMatrix4(new THREE.Matrix4().makeTranslation(0, 0, BASE_BOTTOM_CHAMFER));
 
     const sec3 = buildTaperedRoundedRectGeometry(
         FOOT_MID_OUTER, FOOT_MID_OUTER, FOOT_MID_RADIUS,
         FOOT_TOP_OUTER, FOOT_TOP_OUTER, FOOT_TOP_RADIUS,
-        BASE_TOP_CHAMFER
+        BASE_TOP_CHAMFER, false, N
     );
     sec3.applyMatrix4(new THREE.Matrix4().makeTranslation(0, 0, BASE_BOTTOM_CHAMFER + BASE_VERTICAL));
 
     // Bottom cap at Z=0, normals face -Z (flip winding of ShapeGeometry default)
-    const botCapGeo = new THREE.ShapeGeometry(roundedRectShape(FOOT_BOT_OUTER, FOOT_BOT_OUTER, FOOT_BOT_RADIUS));
+    const botCapGeo = new THREE.ShapeGeometry(roundedRectShape(FOOT_BOT_OUTER, FOOT_BOT_OUTER, FOOT_BOT_RADIUS), cornerSegments);
     const botIdx = botCapGeo.index.array;
     for (let i = 0; i < botIdx.length; i += 3) {
         const tmp = botIdx[i + 1];
@@ -163,10 +162,10 @@ export function buildSingleBaseFootGeometry() {
  * Builds a grid of gridfinity base feet for a multi-unit bin.
  * One foot (41.5×41.5mm) per gridfinity unit cell, centered on the 42mm grid pitch.
  */
-export function buildBaseFootsGeometry(outerL, outerW) {
+export function buildBaseFootsGeometry(outerL, outerW, cornerSegments = 32) {
     const unitsX = Math.round((outerW + 0.5) / GRIDFINITY_UNIT);
     const unitsY = Math.round((outerL + 0.5) / GRIDFINITY_UNIT);
-    const singleFoot = buildSingleBaseFootGeometry();
+    const singleFoot = buildSingleBaseFootGeometry(cornerSegments);
     const geos = [];
     for (let i = 0; i < unitsX; i++) {
         for (let j = 0; j < unitsY; j++) {
@@ -188,47 +187,40 @@ export function buildBaseFootsGeometry(outerL, outerW) {
  * Profile: STACKING_LIP_LINE = [[0,0],[0.7,0.7],[0.7,2.5],[2.6,4.4]]
  * Outer face is vertical 4.4mm. Inner face has stepped profile.
  */
-export function buildStackingLipGeometry(outerL, outerW, cornerRadius) {
-    // Outer lip dimensions (inset 0.25mm from bin exterior)
-    const lipOL = outerL - LIP_OUTER_CLEARANCE * 2;
-    const lipOW = outerW - LIP_OUTER_CLEARANCE * 2;
-    const lipOR = Math.max(0, cornerRadius - LIP_OUTER_CLEARANCE);
-
+export function buildStackingLipGeometry(outerL, outerW, cornerRadius, cornerSegments = 32) {
+    const N = cornerSegments * 8;
     // Inner dimensions at inset=0.7mm (bottom chamfer top / vertical inner face)
-    const lip07L = lipOL - LIP_CHAMFER_BOT * 2;
-    const lip07W = lipOW - LIP_CHAMFER_BOT * 2;
-    const lip07R = Math.max(0, lipOR - LIP_CHAMFER_BOT);
+    // Base of innerA starts flush with the bin wall outer face (outerL/outerW/cornerRadius)
+    const lip07L = outerL - LIP_CHAMFER_BOT * 2;
+    const lip07W = outerW - LIP_CHAMFER_BOT * 2;
+    const lip07R = Math.max(0, cornerRadius - LIP_CHAMFER_BOT);
 
     // Inner dimensions at inset=2.6mm (lip tip / top cap inner edge)
-    const lip26L = lipOL - LIP_TOTAL_DEPTH * 2;
-    const lip26W = lipOW - LIP_TOTAL_DEPTH * 2;
-    const lip26R = Math.max(0, lipOR - LIP_TOTAL_DEPTH);
+    const lip26L = outerL - LIP_TOTAL_DEPTH * 2;
+    const lip26W = outerW - LIP_TOTAL_DEPTH * 2;
+    const lip26R = Math.max(0, cornerRadius - LIP_TOTAL_DEPTH);
 
-    // Outer face: constant vertical wall, full 4.4mm (outward normals)
-    const outerFace = buildTaperedRoundedRectGeometry(
-        lipOL, lipOW, lipOR, lipOL, lipOW, lipOR, LIP_HEIGHT);
-
-    // Inner section A: bottom chamfer Z=0→0.7, inset 0→0.7mm 45° (inward normals)
+    // Inner section A: bottom chamfer Z=0→0.7, base flush with bin wall, inset 0→0.7mm 45°
     const innerA = buildTaperedRoundedRectGeometry(
-        lipOL, lipOW, lipOR, lip07L, lip07W, lip07R, LIP_CHAMFER_BOT, true);
+        outerL, outerW, cornerRadius, lip07L, lip07W, lip07R, LIP_CHAMFER_BOT, true, N);
 
     // Inner section B: vertical inner wall Z=0.7→2.5, inset stays 0.7mm (inward normals)
     const innerB = buildTaperedRoundedRectGeometry(
-        lip07L, lip07W, lip07R, lip07L, lip07W, lip07R, LIP_VERT, true);
+        lip07L, lip07W, lip07R, lip07L, lip07W, lip07R, LIP_VERT, true, N);
     innerB.applyMatrix4(new THREE.Matrix4().makeTranslation(0, 0, LIP_CHAMFER_BOT));
 
     // Inner section C: top chamfer Z=2.5→4.4, inset 0.7→2.6mm 45° (inward normals)
     const innerC = buildTaperedRoundedRectGeometry(
-        lip07L, lip07W, lip07R, lip26L, lip26W, lip26R, LIP_CHAMFER_TOP, true);
+        lip07L, lip07W, lip07R, lip26L, lip26W, lip26R, LIP_CHAMFER_TOP, true, N);
     innerC.applyMatrix4(new THREE.Matrix4().makeTranslation(0, 0, LIP_CHAMFER_BOT + LIP_VERT));
 
     // Top ring cap at Z=4.4 (+Z normals via ShapeGeometry with hole)
-    const topShape = roundedRectShape(lipOL, lipOW, lipOR);
+    const topShape = roundedRectShape(outerL, outerW, cornerRadius);
     topShape.holes = [roundedRectPath(lip26L, lip26W, lip26R)];
-    const topCap = new THREE.ShapeGeometry(topShape, 32);
+    const topCap = new THREE.ShapeGeometry(topShape, cornerSegments);
     topCap.applyMatrix4(new THREE.Matrix4().makeTranslation(0, 0, LIP_HEIGHT));
 
-    return mergeGeometries([outerFace, innerA, innerB, innerC, topCap]);
+    return mergeGeometries([innerA, innerB, innerC, topCap]);
 }
 
 /**
@@ -236,7 +228,7 @@ export function buildStackingLipGeometry(outerL, outerW, cornerRadius) {
  * Returns a merged THREE.BufferGeometry ready for export or preview.
  */
 export function buildBinGeometry(binConfig, inlayConfig) {
-    const { wallThickness, floorThickness, heightMm, stackingLip, baseFeet } = binConfig;
+    const { wallThickness, floorThickness, heightMm, stackingLip, baseFeet, cornerSegments = 32 } = binConfig;
     const innerL = inlayConfig.length;
     const innerW = inlayConfig.width;
     const innerCornerRadius = inlayConfig.cornerRadius;
@@ -248,23 +240,23 @@ export function buildBinGeometry(binConfig, inlayConfig) {
     const wallHeight = heightMm - BASE_HEIGHT - floorThickness - (stackingLip ? LIP_HEIGHT : 0);
 
     // Floor sits on top of the base foot zone
-    const floorGeo = buildFloorGeometry(outerL, outerW, outerCornerRadius, floorThickness);
+    const floorGeo = buildFloorGeometry(outerL, outerW, outerCornerRadius, floorThickness, cornerSegments);
     floorGeo.applyMatrix4(new THREE.Matrix4().makeTranslation(0, 0, BASE_HEIGHT));
 
     // Walls start above the floor
-    const wallsGeo = buildWallsGeometry(outerL, outerW, innerL, innerW, outerCornerRadius, innerCornerRadius, wallHeight);
+    const wallsGeo = buildWallsGeometry(outerL, outerW, innerL, innerW, outerCornerRadius, innerCornerRadius, wallHeight, cornerSegments);
     wallsGeo.applyMatrix4(new THREE.Matrix4().makeTranslation(0, 0, BASE_HEIGHT + floorThickness));
 
     const geometries = [floorGeo, wallsGeo];
 
     if (baseFeet) {
-        const feetGeo = buildBaseFootsGeometry(outerL, outerW);
+        const feetGeo = buildBaseFootsGeometry(outerL, outerW, cornerSegments);
         geometries.push(feetGeo);
     }
 
     if (stackingLip) {
         // toNonIndexed() because floor/walls use ExtrudeGeometry (non-indexed)
-        const lipGeo = buildStackingLipGeometry(outerL, outerW, outerCornerRadius).toNonIndexed();
+        const lipGeo = buildStackingLipGeometry(outerL, outerW, outerCornerRadius, cornerSegments).toNonIndexed();
         lipGeo.applyMatrix4(new THREE.Matrix4().makeTranslation(0, 0, BASE_HEIGHT + floorThickness + wallHeight));
         geometries.push(lipGeo);
     }

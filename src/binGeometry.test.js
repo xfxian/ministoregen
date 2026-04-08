@@ -206,34 +206,28 @@ describe('buildBaseFootsGeometry', () => {
 describe('buildStackingLipGeometry — profile accuracy', () => {
     // Use a 1u bin outer for simple expected dimensions
     const outerL = 41.5, outerW = 41.5, cornerR = 3.75;
-    const LIP_OUTER_CLEARANCE = 0.25;
-    const lipOL = outerL - LIP_OUTER_CLEARANCE * 2; // 41.0
 
-    it('at Z≈0, outer XY extents match lip outer dims (41.0mm)', () => {
+    it('at Z≈0, outer XY extents match bin outer dims (41.5mm)', () => {
         const geo = buildStackingLipGeometry(outerL, outerW, cornerR);
         const ni = geo.toNonIndexed();
         const ext = xyExtentsAtZ(ni, 0);
         expect(ext).not.toBeNull();
-        expect(ext.maxX).toBeCloseTo(lipOL / 2, 0);
+        expect(ext.maxX).toBeCloseTo(outerL / 2, 0);
     });
 
-    it('outer XY extents are the same at Z=0 and Z=LIP_HEIGHT (vertical outer face)', () => {
-        // The outer face has vertices only at Z=0 and Z=LIP_HEIGHT (lofted surface, no intermediate verts)
+    it('innerA base is flush with bin wall at Z=0 (outerL/2)', () => {
         const geo = buildStackingLipGeometry(outerL, outerW, cornerR).toNonIndexed();
-        const ext0   = xyExtentsAtZ(geo, 0);
-        const extTop = xyExtentsAtZ(geo, LIP_HEIGHT);
-        expect(ext0).not.toBeNull();
-        expect(extTop).not.toBeNull();
-        expect(extTop.maxX).toBeCloseTo(ext0.maxX, 0);
+        const ext = xyExtentsAtZ(geo, 0);
+        expect(ext).not.toBeNull();
+        expect(ext.maxX).toBeCloseTo(outerL / 2, 0);
     });
 
-    it('at Z≈0.7, vertices are at inner edge (inset 0.7mm from outer)', () => {
-        // At Z=0.7, only innerA's TOP vertices exist (outer face has no vertex at this Z).
-        // innerA top = inset 0.7mm → maxX ≈ lipOL/2 - 0.7
+    it('at Z≈0.7, vertices are at inner edge (inset 0.7mm from bin wall)', () => {
+        // At Z=0.7, innerA's top vertices: inset 0.7mm from outerL/2
         const geo = buildStackingLipGeometry(outerL, outerW, cornerR).toNonIndexed();
         const ext = xyExtentsAtZ(geo, LIP_Z_07);
         expect(ext).not.toBeNull();
-        expect(ext.maxX).toBeCloseTo(lipOL / 2 - LIP_INSET_07, 0); // ≈ 19.8
+        expect(ext.maxX).toBeCloseTo(outerL / 2 - LIP_INSET_07, 0); // ≈ 20.05
     });
 
     it('at Z≈2.5, inner XY is still inset 0.7mm (vertical section)', () => {
@@ -246,13 +240,13 @@ describe('buildStackingLipGeometry — profile accuracy', () => {
         expect(ext25.minX).toBeCloseTo(ext07.minX, 0);
     });
 
-    it('at Z=LIP_HEIGHT (4.4mm), inner edge is inset 2.6mm from outer', () => {
+    it('at Z=LIP_HEIGHT (4.4mm), outer edge matches bin wall, inner edge inset 2.6mm', () => {
         const geo = buildStackingLipGeometry(outerL, outerW, cornerR).toNonIndexed();
         const ext = xyExtentsAtZ(geo, LIP_HEIGHT);
         expect(ext).not.toBeNull();
-        // Top cap inner edge: lipOL/2 - 2.6
-        const expectedInnerHalf = lipOL / 2 - LIP_INSET_26;
-        expect(ext.maxX).toBeCloseTo(lipOL / 2, 0);          // outer still present
+        // Top cap outer edge: outerL/2
+        const expectedInnerHalf = outerL / 2 - LIP_INSET_26;
+        expect(ext.maxX).toBeCloseTo(outerL / 2, 0);          // outer at bin wall
         expect(ext.minX).toBeLessThan(-(expectedInnerHalf - 0.5)); // inner edge present
     });
 
@@ -268,30 +262,13 @@ describe('buildStackingLipGeometry — profile accuracy', () => {
 
 describe('buildStackingLipGeometry — normals', () => {
     const outerL = 41.5, outerW = 41.5, cornerR = 3.75;
-    const LIP_OUTER_CLEARANCE = 0.25;
-    const lipOHalfL = (outerL - LIP_OUTER_CLEARANCE * 2) / 2;
-
-    it('outer face normals point radially outward', () => {
-        // Outer face is the only section that spans the FULL height (Z=0 to Z=LIP_HEIGHT).
-        // Isolate it by checking that the triangle has one vertex at Z≈0 AND one at Z≈LIP_HEIGHT.
-        const geo = buildStackingLipGeometry(outerL, outerW, cornerR).toNonIndexed();
-        const bad = countBadTriangles(geo, (n, centroid, a, b, c) => {
-            const verts = [a, b, c];
-            const hasZ0  = verts.some(v => Math.abs(v.z) < 0.05);
-            const hasZtop = verts.some(v => Math.abs(v.z - LIP_HEIGHT) < 0.05);
-            if (!hasZ0 || !hasZtop) return true; // skip non-outer-face triangles
-            const outward = new THREE.Vector3(centroid.x, centroid.y, 0).normalize();
-            return n.dot(outward) > 0;
-        });
-        expect(bad).toBe(0);
-    });
 
     it('inner face normals point radially inward', () => {
         const geo = buildStackingLipGeometry(outerL, outerW, cornerR).toNonIndexed();
         const bad = countBadTriangles(geo, (n, centroid) => {
-            // Inner face: centroid XY radius clearly smaller than outer, not at top cap Z
+            // Inner face: centroid XY radius clearly smaller than bin outer, not at top cap Z
             const r = Math.sqrt(centroid.x ** 2 + centroid.y ** 2);
-            if (r > lipOHalfL * 0.92) return true; // skip outer face
+            if (r > (outerL / 2) * 0.92) return true; // skip outermost triangles
             if (Math.abs(n.z) > 0.5) return true;  // skip top cap
             if (centroid.z < 0.05) return true;     // skip any bottom edge
             // Inward means n dot radial < 0
