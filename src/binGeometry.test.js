@@ -27,7 +27,6 @@ const BASE_BOTTOM_CHAMFER = 0.8;
 const BASE_VERTICAL_TOP = BASE_BOTTOM_CHAMFER + 1.8; // Z=2.6
 // Stacking lip profile keypoints [inset, z]:
 // [0,0], [0.7,0.7], [0.7,2.5], [2.6,4.4]
-const LIP_INSET_0  = 0.0;
 const LIP_INSET_07 = 0.7;
 const LIP_INSET_26 = 2.6;
 const LIP_Z_07 = 0.7;
@@ -209,7 +208,6 @@ describe('buildStackingLipGeometry — profile accuracy', () => {
     const outerL = 41.5, outerW = 41.5, cornerR = 3.75;
     const LIP_OUTER_CLEARANCE = 0.25;
     const lipOL = outerL - LIP_OUTER_CLEARANCE * 2; // 41.0
-    const lipOW = outerW - LIP_OUTER_CLEARANCE * 2; // 41.0
 
     it('at Z≈0, outer XY extents match lip outer dims (41.0mm)', () => {
         const geo = buildStackingLipGeometry(outerL, outerW, cornerR);
