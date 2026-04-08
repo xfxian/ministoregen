@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { computeSectionStrips } from './utils/sectionMath';
 
 /**
  * @param {number} length
@@ -122,36 +123,48 @@ function hexagonalLayout(length, width, margin, baseSizeX, baseSizeY, baseSpacin
     return holes;
 }
 
-function Inlay({ modelRef, modelConfig, previewConfig, binEnabled }) {
+function Inlay({ modelRef, modelConfig, previewConfig, binEnabled, selectedSection }) {
     const { inlay, base } = modelConfig;
 
     const lengthWithClearance = inlay.length - inlay.clearance;
     const widthWithClearance = inlay.width - inlay.clearance;
 
     // Inlay
-
     const inlayShape = roundedRect(lengthWithClearance, widthWithClearance, inlay.cornerRadius);
 
-    base.sections.flatMap((section, index) => {
-        const lengthWithClearanceAndMargin = lengthWithClearance - inlay.margin * 2;
-        const lengthWithShare = (section.share * lengthWithClearanceAndMargin) / 100;
-        const accumulatedYPercentage = base.sections
-            .map(s => s.share)
-            .reduce((prev, curr, i) => (i < index ? prev + curr : prev), 0);
-        const accumulatedYOffset = (accumulatedYPercentage * lengthWithClearanceAndMargin) / 100;
-        const sectionYOffset = (-lengthWithClearanceAndMargin / 2) + accumulatedYOffset + (lengthWithShare / 2);
+    // Compute section strips (shared math with SVG sidebar viz)
+    const strips = computeSectionStrips(inlay, base.sections);
 
-        const holePositions = hexagonalLayout(lengthWithShare, widthWithClearance, inlay.margin, section.sizeX, section.sizeY, section.spacing, section.clearance, 0, sectionYOffset);
-        inlayShape.holes = inlayShape.holes.concat(holePositions.map(([x, y]) => bezierEllipse(x, y, (section.sizeX / 2) + (section.clearance / 2), (section.sizeY / 2) + (section.clearance / 2), section.curvatureFactor)));
-        return holePositions;
+    base.sections.forEach((section, index) => {
+        const { centerY, halfHeight } = strips[index];
+        const stripLength = halfHeight * 2;
+
+        const holePositions = hexagonalLayout(
+            stripLength, widthWithClearance,
+            inlay.margin, section.sizeX, section.sizeY,
+            section.spacing, section.clearance,
+            0, centerY
+        );
+        inlayShape.holes = inlayShape.holes.concat(
+            holePositions.map(([x, y]) =>
+                bezierEllipse(
+                    x, y,
+                    (section.sizeX / 2) + (section.clearance / 2),
+                    (section.sizeY / 2) + (section.clearance / 2),
+                    section.curvatureFactor
+                )
+            )
+        );
     });
 
     const extrudeSettings = { steps: 4, depth: inlay.depth, curveSegments: 64, bevelEnabled: false };
 
     // Visualization
-
     const marginShape = roundedRect(lengthWithClearance - (inlay.margin * 2), widthWithClearance - (inlay.margin * 2), inlay.cornerRadius);
     const marginGeometry = new THREE.BufferGeometry().setFromPoints(marginShape.getPoints());
+
+    // Selected section highlight
+    const highlightStrip = selectedSection !== null ? strips[selectedSection] : null;
 
     return (
         <group>
@@ -162,6 +175,14 @@ function Inlay({ modelRef, modelConfig, previewConfig, binEnabled }) {
             <line geometry={marginGeometry} position={[0, 0, inlay.depth + 0.1]}>
                 <lineDashedMaterial color={'blue'} dashSize={20} gapSize={5} linewidth={1} />
             </line>
+
+            {/* Section highlight overlay */}
+            {highlightStrip && (
+                <mesh position={[0, highlightStrip.centerY, inlay.depth + 0.05]}>
+                    <planeGeometry args={[highlightStrip.fullWidth - inlay.margin * 2, highlightStrip.halfHeight * 2]} />
+                    <meshBasicMaterial color="#2196f3" transparent opacity={0.35} depthWrite={false} />
+                </mesh>
+            )}
         </group>
     );
 }

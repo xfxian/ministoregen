@@ -3,7 +3,7 @@ import { Canvas } from '@react-three/fiber';
 import Inlay from './Inlay';
 import Bin from './Bin';
 
-function ModelPreview({ modelRef, binRef, modelConfig, binConfig, previewConfig }) {
+function ModelPreview({ modelRef, binRef, modelConfig, binConfig, previewConfig, selectedSection }) {
     return (
         <Canvas shadows camera={{ position: [75, 75, 75] }}>
             <Grid
@@ -22,7 +22,13 @@ function ModelPreview({ modelRef, binRef, modelConfig, binConfig, previewConfig 
                 {binConfig.enabled && (
                     <Bin binRef={binRef} binConfig={binConfig} modelConfig={modelConfig} previewConfig={previewConfig} />
                 )}
-                <Inlay modelRef={modelRef} modelConfig={modelConfig} previewConfig={previewConfig} binEnabled={binConfig.enabled} />
+                <Inlay
+                    modelRef={modelRef}
+                    modelConfig={modelConfig}
+                    previewConfig={previewConfig}
+                    binEnabled={binConfig.enabled}
+                    selectedSection={selectedSection}
+                />
             </group>
 
             <CameraControls makeDefault />
