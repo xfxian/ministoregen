@@ -16,6 +16,7 @@ import {
   DialogTitle,
   Drawer,
   FormControlLabel,
+  FormHelperText,
   Grid2 as Grid,
   InputAdornment,
   MenuItem,
@@ -440,6 +441,22 @@ function App() {
                       }
                       label="Stacking Lip"
                     />
+                  </Grid>
+                  <Grid size={12}>
+                    <FormControlLabel
+                      control={
+                        <Switch
+                          checked={binConfig.baseFeet}
+                          onChange={(e) => handleBinConfigChange('baseFeet', e.target.checked)}
+                          disabled={!isGridfinityMode}
+                          color="primary"
+                        />
+                      }
+                      label="Gridfinity Base Feet"
+                    />
+                    {!isGridfinityMode && (
+                      <FormHelperText>Only available when using Gridfinity units</FormHelperText>
+                    )}
                   </Grid>
                 </Grid>
               </AccordionDetails>
