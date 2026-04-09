@@ -4,7 +4,7 @@ import Inlay from './Inlay';
 import Bin from './Bin';
 import { BASE_HEIGHT } from './binGeometry';
 
-function ModelPreview({ modelRef, binRef, modelConfig, binConfig, previewConfig, selectedSection }) {
+function ModelPreview({ modelRef, binRef, modelConfig, binConfig, previewConfig, selectedSection, showMiniatureCylinders }) {
     const binEnabled = binConfig.enabled;
 
     // Lift the model so its physical bottom rests on the grid (Z=0).
@@ -44,6 +44,7 @@ function ModelPreview({ modelRef, binRef, modelConfig, binConfig, previewConfig,
                     previewConfig={previewConfig}
                     inlayZOffset={inlayZOffset}
                     selectedSection={selectedSection}
+                    showMiniatureCylinders={showMiniatureCylinders}
                 />
             </group>
 

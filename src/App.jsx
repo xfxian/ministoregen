@@ -21,6 +21,7 @@ import { Mesh } from 'three';
 import { STLExporter } from 'three-stdlib';
 import './App.css';
 import { DEFAULT_BIN_CONFIG, DEFAULT_INLAY, DEFAULT_SECTION, DRAWER_WIDTH, GRIDFINITY_HEIGHT_UNIT } from './config';
+import { calcBinHeightFromGroups, calcMinSectionLength, groupsToSections, snapToGridfinityHeight, snapToGridfinityLength } from './utils/wizardMath';
 import ModelPreview from './ModelPreview';
 import Sidebar from './components/Sidebar';
 import SplitButton from './components/SplitButton';
@@ -84,6 +85,28 @@ function App() {
   const [binHeightUnit, setBinHeightUnit] = useState('mm');
 
   const handleBinConfigChange = (field, value) => {
+    if (field === 'baseFeet' && miniatureGroups.length > 0) {
+      setBinConfig((prev) => {
+        const newConfig = { ...prev, [field]: value };
+        const newHeight = calcBinHeightFromGroups(miniatureGroups, newConfig.floorThickness, newConfig.stackingLip);
+        if (newHeight !== null) {
+          newConfig.heightMm = value ? snapToGridfinityHeight(newHeight) : newHeight;
+        }
+        return newConfig;
+      });
+      setModelConfig((prev) => {
+        const SPACING = 1, CLEARANCE = 0.4;
+        const widthForCalc = prev.inlay.width - prev.inlay.clearance;
+        const stripLengths = miniatureGroups.map((g) =>
+          calcMinSectionLength(g.count, widthForCalc, g.baseSizeX, g.baseSizeY, SPACING, CLEARANCE, prev.inlay.margin)
+        );
+        const totalStrip = stripLengths.reduce((a, b) => a + b, 0);
+        const rawLength = totalStrip + prev.inlay.clearance + 2 * prev.inlay.margin;
+        const totalLength = value ? snapToGridfinityLength(rawLength) : rawLength;
+        return { ...prev, inlay: { ...prev.inlay, length: totalLength } };
+      });
+      return;
+    }
     setBinConfig((prev) => ({ ...prev, [field]: value }));
   };
 
@@ -98,6 +121,9 @@ function App() {
   };
 
   const [previewConfig, setPreviewConfig] = useState({ wireframe: false, color: '#808080' });
+
+  const [miniatureGroups, setMiniatureGroups] = useState([]);
+  const [showMiniatureCylinders, setShowMiniatureCylinders] = useState(true);
 
   const handlePreviewConfigChange = (field, value) => {
     setPreviewConfig((prev) => ({ ...prev, [field]: value }));
@@ -193,6 +219,8 @@ function App() {
               baseMode={baseMode}
               selectedSection={selectedSection}
               isMobile={isMobile}
+              miniatureGroups={miniatureGroups}
+              showMiniatureCylinders={showMiniatureCylinders}
               onClose={() => setDrawerOpen(false)}
               onInlayConfigChange={handleInlayConfigChange}
               onBaseSectionConfigChange={handleBaseSectionConfigChange}
@@ -204,6 +232,45 @@ function App() {
               onInlayModeChange={setInlayMode}
               onBaseModeChange={setBaseMode}
               onSelectSection={setSelectedSection}
+              onMiniatureGroupsChange={(groups) => {
+                setMiniatureGroups(groups);
+                const sections = groupsToSections(groups);
+                if (sections) {
+                  setModelConfig((prev) => {
+                    const SPACING = 1, CLEARANCE = 0.4;
+                    // hexagonalLayout receives widthWithClearance, not raw inlay.width
+                    const widthForCalc = prev.inlay.width - prev.inlay.clearance;
+                    // Each value is a *strip* length (what hexagonalLayout will receive).
+                    // The caller must add clearance + 2×margin to get inlay.length.
+                    const stripLengths = groups.map((g) =>
+                      calcMinSectionLength(
+                        g.count, widthForCalc,
+                        g.baseSizeX, g.baseSizeY,
+                        SPACING, CLEARANCE, prev.inlay.margin
+                      )
+                    );
+                    const totalStrip = stripLengths.reduce((a, b) => a + b, 0);
+                    const rawLength = totalStrip + prev.inlay.clearance + 2 * prev.inlay.margin;
+                    const totalLength = binConfig.baseFeet ? snapToGridfinityLength(rawLength) : rawLength;
+                    const sectionsWithLayout = sections.map((s, i) => ({
+                      ...s,
+                      share: (stripLengths[i] / totalStrip) * 100,
+                    }));
+                    return {
+                      ...prev,
+                      inlay: { ...prev.inlay, length: totalLength },
+                      base: { ...prev.base, sections: sectionsWithLayout },
+                    };
+                  });
+                  setBinConfig((prev) => {
+                    const newHeight = calcBinHeightFromGroups(groups, prev.floorThickness, prev.stackingLip);
+                    if (newHeight === null) return prev;
+                    const snappedHeight = prev.baseFeet ? snapToGridfinityHeight(newHeight) : newHeight;
+                    return { ...prev, heightMm: snappedHeight, enabled: true };
+                  });
+                }
+              }}
+              onShowMiniatureCylindersChange={setShowMiniatureCylinders}
             />
           </Box>
         </Drawer>
@@ -241,6 +308,7 @@ function App() {
             binConfig={binConfig}
             previewConfig={previewConfig}
             selectedSection={selectedSection}
+            showMiniatureCylinders={showMiniatureCylinders}
           />
         </div>
       </div>
