@@ -1,11 +1,11 @@
-import { buildBinGeometry, BASE_HEIGHT } from './binGeometry';
+import { buildBinGeometry } from './binGeometry';
 
-function Bin({ binRef, binConfig, modelConfig, previewConfig }) {
+function Bin({ binRef, binConfig, modelConfig, previewConfig, binZOffset }) {
     const { inlay } = modelConfig;
     const geometry = buildBinGeometry(binConfig, inlay);
 
     return (
-        <mesh ref={binRef} position={[0, 0, -(binConfig.floorThickness + BASE_HEIGHT)]}>
+        <mesh ref={binRef} position={[0, 0, binZOffset]}>
             <primitive object={geometry} attach="geometry" />
             <meshPhysicalMaterial
                 wireframe={previewConfig.wireframe}

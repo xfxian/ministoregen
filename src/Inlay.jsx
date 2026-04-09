@@ -123,7 +123,7 @@ function hexagonalLayout(length, width, margin, baseSizeX, baseSizeY, baseSpacin
     return holes;
 }
 
-function Inlay({ modelRef, modelConfig, previewConfig, binEnabled, selectedSection }) {
+function Inlay({ modelRef, modelConfig, previewConfig, inlayZOffset, selectedSection }) {
     const { inlay, base } = modelConfig;
 
     const lengthWithClearance = inlay.length - inlay.clearance;
@@ -168,17 +168,17 @@ function Inlay({ modelRef, modelConfig, previewConfig, binEnabled, selectedSecti
 
     return (
         <group>
-            <mesh ref={modelRef} position={[0, 0, binEnabled ? 0.01 : 0]}>
+            <mesh ref={modelRef} position={[0, 0, inlayZOffset]}>
                 <extrudeGeometry args={[inlayShape, extrudeSettings]} />
                 <meshPhysicalMaterial wireframe={previewConfig.wireframe} color={previewConfig.color} clearcoat={0.5} clearcoatRoughness={0.4} reflectivity={0.25} />
             </mesh>
-            <line geometry={marginGeometry} position={[0, 0, inlay.depth + 0.1]}>
+            <line geometry={marginGeometry} position={[0, 0, inlayZOffset + inlay.depth + 0.1]}>
                 <lineDashedMaterial color={'blue'} dashSize={20} gapSize={5} linewidth={1} />
             </line>
 
             {/* Section highlight overlay */}
             {highlightStrip && (
-                <mesh position={[0, highlightStrip.centerY, inlay.depth + 0.05]}>
+                <mesh position={[0, highlightStrip.centerY, inlayZOffset + inlay.depth + 0.05]}>
                     <planeGeometry args={[highlightStrip.fullWidth - inlay.margin * 2, highlightStrip.halfHeight * 2]} />
                     <meshBasicMaterial color="#2196f3" transparent opacity={0.35} depthWrite={false} />
                 </mesh>

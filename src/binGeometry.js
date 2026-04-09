@@ -214,13 +214,19 @@ export function buildStackingLipGeometry(outerL, outerW, cornerRadius, cornerSeg
         lip07L, lip07W, lip07R, lip26L, lip26W, lip26R, LIP_CHAMFER_TOP, true, N);
     innerC.applyMatrix4(new THREE.Matrix4().makeTranslation(0, 0, LIP_CHAMFER_BOT + LIP_VERT));
 
+    // Outer face: vertical wall Z=0→4.4, outward-facing normals
+    const outer = buildTaperedRoundedRectGeometry(
+        outerL, outerW, cornerRadius,
+        outerL, outerW, cornerRadius,
+        LIP_HEIGHT, false, N);
+
     // Top ring cap at Z=4.4 (+Z normals via ShapeGeometry with hole)
     const topShape = roundedRectShape(outerL, outerW, cornerRadius);
     topShape.holes = [roundedRectPath(lip26L, lip26W, lip26R)];
     const topCap = new THREE.ShapeGeometry(topShape, cornerSegments);
     topCap.applyMatrix4(new THREE.Matrix4().makeTranslation(0, 0, LIP_HEIGHT));
 
-    return mergeGeometries([innerA, innerB, innerC, topCap]);
+    return mergeGeometries([outer, innerA, innerB, innerC, topCap]);
 }
 
 /**
