@@ -16,7 +16,7 @@ import {
   useMediaQuery,
 } from '@mui/material';
 import { createTheme, ThemeProvider } from '@mui/material/styles';
-import { useEffect, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
 import { Mesh } from 'three';
 import { STLExporter } from 'three-stdlib';
 import './App.css';
@@ -102,17 +102,6 @@ function App() {
 
   const [miniatureGroups, setMiniatureGroups] = useState([]);
   const [showMiniatureCylinders, setShowMiniatureCylinders] = useState(true);
-
-  // Live-sync wizard groups → inlay sections + bin height
-  useEffect(() => {
-    const sections = groupsToSections(miniatureGroups);
-    if (!sections) return;
-    setModelConfig((prev) => ({ ...prev, base: { ...prev.base, sections } }));
-    setBinConfig((prev) => {
-      const newHeight = calcBinHeightFromGroups(miniatureGroups, prev.floorThickness, prev.stackingLip);
-      return newHeight !== null ? { ...prev, heightMm: newHeight, enabled: true } : prev;
-    });
-  }, [miniatureGroups]);
 
   const handlePreviewConfigChange = (field, value) => {
     setPreviewConfig((prev) => ({ ...prev, [field]: value }));
@@ -221,7 +210,17 @@ function App() {
               onInlayModeChange={setInlayMode}
               onBaseModeChange={setBaseMode}
               onSelectSection={setSelectedSection}
-              onMiniatureGroupsChange={setMiniatureGroups}
+              onMiniatureGroupsChange={(groups) => {
+                setMiniatureGroups(groups);
+                const sections = groupsToSections(groups);
+                if (sections) {
+                  setModelConfig((prev) => ({ ...prev, base: { ...prev.base, sections } }));
+                  setBinConfig((prev) => {
+                    const newHeight = calcBinHeightFromGroups(groups, prev.floorThickness, prev.stackingLip);
+                    return newHeight !== null ? { ...prev, heightMm: newHeight, enabled: true } : prev;
+                  });
+                }
+              }}
               onShowMiniatureCylindersChange={setShowMiniatureCylinders}
             />
           </Box>
