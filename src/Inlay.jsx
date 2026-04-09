@@ -196,9 +196,13 @@ function Inlay({ modelRef, modelConfig, previewConfig, inlayZOffset, selectedSec
                     0, centerY
                 );
                 if (positions.length === 0) return null;
+                // Limit cylinders to the specified miniature count for this section
+                const visiblePositions = section.miniatureCount > 0
+                    ? positions.slice(0, section.miniatureCount)
+                    : positions;
                 const radius = (Math.min(section.sizeX, section.sizeY) / 2) + (section.clearance / 2);
                 const h = section.miniatureHeightMm;
-                const cyls = positions.map(([x, y]) => {
+                const cyls = visiblePositions.map(([x, y]) => {
                     const geo = new THREE.CylinderGeometry(radius, radius, h, 12);
                     geo.applyMatrix4(new THREE.Matrix4().makeRotationX(Math.PI / 2));
                     geo.applyMatrix4(new THREE.Matrix4().makeTranslation(x, y, inlayZOffset + inlay.depth + h / 2));

@@ -7,6 +7,7 @@ export const DEFAULT_SECTION = {
   spacing: 1,
   clearance: 0.4,
   miniatureHeightMm: 0,
+  miniatureCount: 0,
   color: '#e74c3c',
 };
 

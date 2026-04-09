@@ -31,8 +31,45 @@ export function calcBinHeightFromGroups(groups, floorThickness, stackingLip) {
 }
 
 /**
+ * Returns the minimum section length (mm) needed to fit `count` holes of size
+ * sizeX×sizeY in a section of the given inlayWidth. Mirrors hexagonalLayout()
+ * logic so the calculated length exactly accommodates the count.
+ */
+export function calcMinSectionLength(count, inlayWidth, sizeX, sizeY, spacing, clearance, margin) {
+  if (count <= 0) return 0;
+
+  const holeDiameterX = sizeX + clearance;
+  const holeDiameterY = sizeY + clearance;
+  const s = holeDiameterY / Math.sqrt(3);
+  const colSpacing = holeDiameterX + spacing / 2;
+  const rowHeight = 1.5 * s + spacing / 2;
+  const usableWidth = inlayWidth - 2 * margin;
+  const numCols = Math.floor(usableWidth / colSpacing);
+
+  if (numCols <= 0) {
+    // Width too small for even one column — stack vertically
+    return count * (holeDiameterY + spacing / 2) + 2 * margin;
+  }
+
+  if (numCols === 1) {
+    const singleRowHeight = holeDiameterY + spacing / 2;
+    return count * singleRowHeight + 2 * margin;
+  }
+
+  // Hex layout: even rows (0, 2, …) have numCols holes;
+  // odd rows (1, 3, …) skip col 0, so numCols - 1 holes.
+  let holes = 0;
+  let rows = 0;
+  while (holes < count) {
+    holes += rows % 2 === 0 ? numCols : numCols - 1;
+    rows++;
+  }
+  return rows * rowHeight + 2 * margin;
+}
+
+/**
  * Converts wizard groups into inlay section objects.
- * Section share is proportional to count × max(sizeX, sizeY) (1-D packing weight).
+ * Shares and inlay length are calculated by the caller using calcMinSectionLength.
  * Returns null when groups is empty.
  */
 export function groupsToSections(groups) {
@@ -49,6 +86,7 @@ export function groupsToSections(groups) {
     spacing: 1,
     clearance: 0.4,
     miniatureHeightMm: g.heightMm,
+    miniatureCount: g.count,
     color: g.color,
   }));
 }

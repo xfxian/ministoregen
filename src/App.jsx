@@ -21,7 +21,7 @@ import { Mesh } from 'three';
 import { STLExporter } from 'three-stdlib';
 import './App.css';
 import { DEFAULT_BIN_CONFIG, DEFAULT_INLAY, DEFAULT_SECTION, DRAWER_WIDTH, GRIDFINITY_HEIGHT_UNIT } from './config';
-import { calcBinHeightFromGroups, groupsToSections } from './utils/wizardMath';
+import { calcBinHeightFromGroups, calcMinSectionLength, groupsToSections } from './utils/wizardMath';
 import ModelPreview from './ModelPreview';
 import Sidebar from './components/Sidebar';
 import SplitButton from './components/SplitButton';
@@ -214,7 +214,27 @@ function App() {
                 setMiniatureGroups(groups);
                 const sections = groupsToSections(groups);
                 if (sections) {
-                  setModelConfig((prev) => ({ ...prev, base: { ...prev.base, sections } }));
+                  setModelConfig((prev) => {
+                    // Calculate the minimum length each section needs to fit its count.
+                    const SPACING = 1, CLEARANCE = 0.4;
+                    const sectionLengths = groups.map((g) =>
+                      calcMinSectionLength(
+                        g.count, prev.inlay.width,
+                        g.baseSizeX, g.baseSizeY,
+                        SPACING, CLEARANCE, prev.inlay.margin
+                      )
+                    );
+                    const totalLength = sectionLengths.reduce((a, b) => a + b, 0);
+                    const sectionsWithLayout = sections.map((s, i) => ({
+                      ...s,
+                      share: (sectionLengths[i] / totalLength) * 100,
+                    }));
+                    return {
+                      ...prev,
+                      inlay: { ...prev.inlay, length: totalLength },
+                      base: { ...prev.base, sections: sectionsWithLayout },
+                    };
+                  });
                   setBinConfig((prev) => {
                     const newHeight = calcBinHeightFromGroups(groups, prev.floorThickness, prev.stackingLip);
                     return newHeight !== null ? { ...prev, heightMm: newHeight, enabled: true } : prev;
