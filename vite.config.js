@@ -4,7 +4,7 @@ import path from 'path'
 
 export default defineConfig({
   plugins: [react({ include: /\.(jsx?|tsx?)$/ })],
-  base: '/ministoregen/',
+  base: './',
   resolve: {
     alias: {
       src: path.resolve(__dirname, './src')
