@@ -31,40 +31,47 @@ export function calcBinHeightFromGroups(groups, floorThickness, stackingLip) {
 }
 
 /**
- * Returns the minimum section length (mm) needed to fit `count` holes of size
- * sizeX×sizeY in a section of the given inlayWidth. Mirrors hexagonalLayout()
- * logic so the calculated length exactly accommodates the count.
+ * Returns the minimum *strip* length (mm) needed to fit `count` holes of size
+ * sizeX×sizeY, given the width that hexagonalLayout will receive
+ * (i.e. inlay.width − inlay.clearance).
+ *
+ * "Strip length" is what computeSectionStrips allocates per section within the
+ * inlay's usable area. hexagonalLayout subtracts 2×margin from this value
+ * internally, so we return (hexUsable + 2×margin + ε) — not the full inlay length.
+ * The caller derives inlay.length as: totalStrip + inlay.clearance + 2×margin.
  */
-export function calcMinSectionLength(count, inlayWidth, sizeX, sizeY, spacing, clearance, margin) {
-  if (count <= 0) return 0;
+export function calcMinSectionLength(count, widthWithClearance, sizeX, sizeY, spacing, clearance, margin) {
+  if (count <= 0) return 2 * margin; // empty strip still needs its internal margin
 
   const holeDiameterX = sizeX + clearance;
   const holeDiameterY = sizeY + clearance;
   const s = holeDiameterY / Math.sqrt(3);
   const colSpacing = holeDiameterX + spacing / 2;
   const rowHeight = 1.5 * s + spacing / 2;
-  const usableWidth = inlayWidth - 2 * margin;
+  const usableWidth = widthWithClearance - 2 * margin;
   const numCols = Math.floor(usableWidth / colSpacing);
 
+  // Small epsilon guards against floating-point floor cutting off the last row
+  const EPS = 0.01;
+
   if (numCols <= 0) {
-    // Width too small for even one column — stack vertically
-    return count * (holeDiameterY + spacing / 2) + 2 * margin;
+    // Base wider than available width — size by height only
+    return count * (holeDiameterY + spacing / 2) + 2 * margin + EPS;
   }
 
   if (numCols === 1) {
     const singleRowHeight = holeDiameterY + spacing / 2;
-    return count * singleRowHeight + 2 * margin;
+    return count * singleRowHeight + 2 * margin + EPS;
   }
 
-  // Hex layout: even rows (0, 2, …) have numCols holes;
-  // odd rows (1, 3, …) skip col 0, so numCols - 1 holes.
+  // Hex layout: even rows have numCols holes; odd rows have numCols − 1.
   let holes = 0;
   let rows = 0;
   while (holes < count) {
     holes += rows % 2 === 0 ? numCols : numCols - 1;
     rows++;
   }
-  return rows * rowHeight + 2 * margin;
+  return rows * rowHeight + 2 * margin + EPS;
 }
 
 /**

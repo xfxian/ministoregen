@@ -215,19 +215,23 @@ function App() {
                 const sections = groupsToSections(groups);
                 if (sections) {
                   setModelConfig((prev) => {
-                    // Calculate the minimum length each section needs to fit its count.
                     const SPACING = 1, CLEARANCE = 0.4;
-                    const sectionLengths = groups.map((g) =>
+                    // hexagonalLayout receives widthWithClearance, not raw inlay.width
+                    const widthForCalc = prev.inlay.width - prev.inlay.clearance;
+                    // Each value is a *strip* length (what hexagonalLayout will receive).
+                    // The caller must add clearance + 2×margin to get inlay.length.
+                    const stripLengths = groups.map((g) =>
                       calcMinSectionLength(
-                        g.count, prev.inlay.width,
+                        g.count, widthForCalc,
                         g.baseSizeX, g.baseSizeY,
                         SPACING, CLEARANCE, prev.inlay.margin
                       )
                     );
-                    const totalLength = sectionLengths.reduce((a, b) => a + b, 0);
+                    const totalStrip = stripLengths.reduce((a, b) => a + b, 0);
+                    const totalLength = totalStrip + prev.inlay.clearance + 2 * prev.inlay.margin;
                     const sectionsWithLayout = sections.map((s, i) => ({
                       ...s,
-                      share: (sectionLengths[i] / totalLength) * 100,
+                      share: (stripLengths[i] / totalStrip) * 100,
                     }));
                     return {
                       ...prev,
