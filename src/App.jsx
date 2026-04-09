@@ -16,11 +16,12 @@ import {
   useMediaQuery,
 } from '@mui/material';
 import { createTheme, ThemeProvider } from '@mui/material/styles';
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Mesh } from 'three';
 import { STLExporter } from 'three-stdlib';
 import './App.css';
 import { DEFAULT_BIN_CONFIG, DEFAULT_INLAY, DEFAULT_SECTION, DRAWER_WIDTH, GRIDFINITY_HEIGHT_UNIT } from './config';
+import { calcBinHeightFromGroups, groupsToSections } from './utils/wizardMath';
 import ModelPreview from './ModelPreview';
 import Sidebar from './components/Sidebar';
 import SplitButton from './components/SplitButton';
@@ -98,6 +99,20 @@ function App() {
   };
 
   const [previewConfig, setPreviewConfig] = useState({ wireframe: false, color: '#808080' });
+
+  const [miniatureGroups, setMiniatureGroups] = useState([]);
+  const [showMiniatureCylinders, setShowMiniatureCylinders] = useState(true);
+
+  // Live-sync wizard groups → inlay sections + bin height
+  useEffect(() => {
+    const sections = groupsToSections(miniatureGroups);
+    if (!sections) return;
+    setModelConfig((prev) => ({ ...prev, base: { ...prev.base, sections } }));
+    setBinConfig((prev) => {
+      const newHeight = calcBinHeightFromGroups(miniatureGroups, prev.floorThickness, prev.stackingLip);
+      return newHeight !== null ? { ...prev, heightMm: newHeight, enabled: true } : prev;
+    });
+  }, [miniatureGroups]);
 
   const handlePreviewConfigChange = (field, value) => {
     setPreviewConfig((prev) => ({ ...prev, [field]: value }));
@@ -193,6 +208,8 @@ function App() {
               baseMode={baseMode}
               selectedSection={selectedSection}
               isMobile={isMobile}
+              miniatureGroups={miniatureGroups}
+              showMiniatureCylinders={showMiniatureCylinders}
               onClose={() => setDrawerOpen(false)}
               onInlayConfigChange={handleInlayConfigChange}
               onBaseSectionConfigChange={handleBaseSectionConfigChange}
@@ -204,6 +221,8 @@ function App() {
               onInlayModeChange={setInlayMode}
               onBaseModeChange={setBaseMode}
               onSelectSection={setSelectedSection}
+              onMiniatureGroupsChange={setMiniatureGroups}
+              onShowMiniatureCylindersChange={setShowMiniatureCylinders}
             />
           </Box>
         </Drawer>
@@ -241,6 +260,7 @@ function App() {
             binConfig={binConfig}
             previewConfig={previewConfig}
             selectedSection={selectedSection}
+            showMiniatureCylinders={showMiniatureCylinders}
           />
         </div>
       </div>

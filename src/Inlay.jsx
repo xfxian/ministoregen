@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { computeSectionStrips } from './utils/sectionMath';
 
 /**
@@ -123,7 +124,7 @@ function hexagonalLayout(length, width, margin, baseSizeX, baseSizeY, baseSpacin
     return holes;
 }
 
-function Inlay({ modelRef, modelConfig, previewConfig, inlayZOffset, selectedSection }) {
+function Inlay({ modelRef, modelConfig, previewConfig, inlayZOffset, selectedSection, showMiniatureCylinders }) {
     const { inlay, base } = modelConfig;
 
     const lengthWithClearance = inlay.length - inlay.clearance;
@@ -183,6 +184,39 @@ function Inlay({ modelRef, modelConfig, previewConfig, inlayZOffset, selectedSec
                     <meshBasicMaterial color="#2196f3" transparent opacity={0.35} depthWrite={false} />
                 </mesh>
             )}
+
+            {/* Miniature cylinder overlays */}
+            {showMiniatureCylinders && base.sections.map((section, i) => {
+                if (!section.miniatureHeightMm) return null;
+                const { centerY, halfHeight } = strips[i];
+                const positions = hexagonalLayout(
+                    halfHeight * 2, widthWithClearance,
+                    inlay.margin, section.sizeX, section.sizeY,
+                    section.spacing, section.clearance,
+                    0, centerY
+                );
+                if (positions.length === 0) return null;
+                const radius = (Math.min(section.sizeX, section.sizeY) / 2) + (section.clearance / 2);
+                const h = section.miniatureHeightMm;
+                const cyls = positions.map(([x, y]) => {
+                    const geo = new THREE.CylinderGeometry(radius, radius, h, 12);
+                    geo.applyMatrix4(new THREE.Matrix4().makeRotationX(Math.PI / 2));
+                    geo.applyMatrix4(new THREE.Matrix4().makeTranslation(x, y, inlayZOffset + inlay.depth + h / 2));
+                    return geo;
+                });
+                const merged = mergeGeometries(cyls);
+                if (!merged) return null;
+                return (
+                    <mesh key={`cyl-${i}`} geometry={merged}>
+                        <meshPhysicalMaterial
+                            color={section.color || '#e74c3c'}
+                            transparent
+                            opacity={0.55}
+                            depthWrite={false}
+                        />
+                    </mesh>
+                );
+            })}
         </group>
     );
 }

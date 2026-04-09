@@ -1,4 +1,5 @@
 import { Close, CropPortrait, ExpandMore, Inventory2Outlined, Preview, Settings } from '@mui/icons-material';
+import AutoFixHighIcon from '@mui/icons-material/AutoFixHigh';
 import AddIcon from '@mui/icons-material/Add';
 import DeleteIcon from '@mui/icons-material/Delete';
 import {
@@ -28,6 +29,7 @@ import { useState } from 'react';
 import { GRIDFINITY_HEIGHT_UNIT, SELECT_ITEMS } from '../config';
 import NumberInput from './NumberInput';
 import SectionViz from './SectionViz';
+import MiniatureWizard from './MiniatureWizard';
 
 // Primary fields shown by default; everything else goes into Advanced
 const INLAY_PRIMARY = ['length', 'width'];
@@ -134,6 +136,8 @@ function Sidebar({
   baseMode,
   selectedSection,
   isMobile,
+  miniatureGroups,
+  showMiniatureCylinders,
   onClose,
   onInlayConfigChange,
   onBaseSectionConfigChange,
@@ -145,6 +149,8 @@ function Sidebar({
   onInlayModeChange,
   onBaseModeChange,
   onSelectSection,
+  onMiniatureGroupsChange,
+  onShowMiniatureCylindersChange,
 }) {
   const [activeTab, setActiveTab] = useState(0);
 
@@ -199,6 +205,7 @@ function Sidebar({
         <Tab icon={<Settings fontSize="small" />} iconPosition="start" label="General" sx={{ minHeight: 48, fontSize: '0.75rem' }} />
         <Tab icon={<CropPortrait fontSize="small" />} iconPosition="start" label="Inlay" sx={{ minHeight: 48, fontSize: '0.75rem' }} />
         <Tab icon={<Inventory2Outlined fontSize="small" />} iconPosition="start" label="Bin" sx={{ minHeight: 48, fontSize: '0.75rem' }} />
+        <Tab icon={<AutoFixHighIcon fontSize="small" />} iconPosition="start" label="Miniatures" sx={{ minHeight: 48, fontSize: '0.75rem' }} />
       </Tabs>
 
       {/* ── TAB 0: GENERAL ── */}
@@ -400,6 +407,17 @@ function Sidebar({
             </Box>
           )}
         </Box>
+      </TabPanel>
+
+      {/* ── TAB 3: MINIATURES ── */}
+      <TabPanel value={activeTab} index={3}>
+        <MiniatureWizard
+          groups={miniatureGroups}
+          onChange={onMiniatureGroupsChange}
+          binConfig={binConfig}
+          showCylinders={showMiniatureCylinders}
+          onShowCylindersChange={onShowMiniatureCylindersChange}
+        />
       </TabPanel>
 
       {/* ── TAB 2: BIN ── */}

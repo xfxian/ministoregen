@@ -5,7 +5,9 @@ export const DEFAULT_SECTION = {
   sizeY: 25,
   curvatureFactor: 0.55,
   spacing: 1,
-  clearance: 0.4
+  clearance: 0.4,
+  miniatureHeightMm: 0,
+  color: '#e74c3c',
 };
 
 export const DEFAULT_INLAY = {
