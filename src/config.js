@@ -22,8 +22,8 @@ export const DEFAULT_INLAY = {
 
 // Gridfinity bin dimensions
 // Note: every bin manufacturer is slightly different; these values are a common baseline.
-const GRIDFINITY_UNIT = 42;
-const GRIDFINITY_SPACER = 0.5;
+export const GRIDFINITY_UNIT = 42;
+export const GRIDFINITY_SPACER = 0.5;
 export const GRIDFINITY_WALL_THICKNESS = 1.8;
 export const GRIDFINITY_HEIGHT_UNIT = 7; // mm per gridfinity height unit
 

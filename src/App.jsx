@@ -21,7 +21,7 @@ import { Mesh } from 'three';
 import { STLExporter } from 'three-stdlib';
 import './App.css';
 import { DEFAULT_BIN_CONFIG, DEFAULT_INLAY, DEFAULT_SECTION, DRAWER_WIDTH, GRIDFINITY_HEIGHT_UNIT } from './config';
-import { calcBinHeightFromGroups, calcMinSectionLength, groupsToSections } from './utils/wizardMath';
+import { calcBinHeightFromGroups, calcMinSectionLength, groupsToSections, snapToGridfinityHeight, snapToGridfinityLength } from './utils/wizardMath';
 import ModelPreview from './ModelPreview';
 import Sidebar from './components/Sidebar';
 import SplitButton from './components/SplitButton';
@@ -85,6 +85,28 @@ function App() {
   const [binHeightUnit, setBinHeightUnit] = useState('mm');
 
   const handleBinConfigChange = (field, value) => {
+    if (field === 'baseFeet' && miniatureGroups.length > 0) {
+      setBinConfig((prev) => {
+        const newConfig = { ...prev, [field]: value };
+        const newHeight = calcBinHeightFromGroups(miniatureGroups, newConfig.floorThickness, newConfig.stackingLip);
+        if (newHeight !== null) {
+          newConfig.heightMm = value ? snapToGridfinityHeight(newHeight) : newHeight;
+        }
+        return newConfig;
+      });
+      setModelConfig((prev) => {
+        const SPACING = 1, CLEARANCE = 0.4;
+        const widthForCalc = prev.inlay.width - prev.inlay.clearance;
+        const stripLengths = miniatureGroups.map((g) =>
+          calcMinSectionLength(g.count, widthForCalc, g.baseSizeX, g.baseSizeY, SPACING, CLEARANCE, prev.inlay.margin)
+        );
+        const totalStrip = stripLengths.reduce((a, b) => a + b, 0);
+        const rawLength = totalStrip + prev.inlay.clearance + 2 * prev.inlay.margin;
+        const totalLength = value ? snapToGridfinityLength(rawLength) : rawLength;
+        return { ...prev, inlay: { ...prev.inlay, length: totalLength } };
+      });
+      return;
+    }
     setBinConfig((prev) => ({ ...prev, [field]: value }));
   };
 
@@ -228,7 +250,8 @@ function App() {
                       )
                     );
                     const totalStrip = stripLengths.reduce((a, b) => a + b, 0);
-                    const totalLength = totalStrip + prev.inlay.clearance + 2 * prev.inlay.margin;
+                    const rawLength = totalStrip + prev.inlay.clearance + 2 * prev.inlay.margin;
+                    const totalLength = binConfig.baseFeet ? snapToGridfinityLength(rawLength) : rawLength;
                     const sectionsWithLayout = sections.map((s, i) => ({
                       ...s,
                       share: (stripLengths[i] / totalStrip) * 100,
@@ -241,7 +264,9 @@ function App() {
                   });
                   setBinConfig((prev) => {
                     const newHeight = calcBinHeightFromGroups(groups, prev.floorThickness, prev.stackingLip);
-                    return newHeight !== null ? { ...prev, heightMm: newHeight, enabled: true } : prev;
+                    if (newHeight === null) return prev;
+                    const snappedHeight = prev.baseFeet ? snapToGridfinityHeight(newHeight) : newHeight;
+                    return { ...prev, heightMm: snappedHeight, enabled: true };
                   });
                 }
               }}

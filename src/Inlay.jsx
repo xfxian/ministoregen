@@ -205,7 +205,7 @@ function Inlay({ modelRef, modelConfig, previewConfig, inlayZOffset, selectedSec
                 const cyls = visiblePositions.map(([x, y]) => {
                     const geo = new THREE.CylinderGeometry(radius, radius, h, 12);
                     geo.applyMatrix4(new THREE.Matrix4().makeRotationX(Math.PI / 2));
-                    geo.applyMatrix4(new THREE.Matrix4().makeTranslation(x, y, inlayZOffset + inlay.depth + h / 2));
+                    geo.applyMatrix4(new THREE.Matrix4().makeTranslation(x, y, inlayZOffset + h / 2));
                     return geo;
                 });
                 const merged = mergeGeometries(cyls);

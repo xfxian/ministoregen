@@ -1,4 +1,5 @@
 import { BASE_HEIGHT, LIP_HEIGHT } from '../binGeometry';
+import { GRIDFINITY_UNIT, GRIDFINITY_SPACER, GRIDFINITY_WALL_THICKNESS, GRIDFINITY_HEIGHT_UNIT } from '../config';
 
 export const BASE_PRESETS = {
   round: [
@@ -96,6 +97,22 @@ export function groupsToSections(groups) {
     miniatureCount: g.count,
     color: g.color,
   }));
+}
+
+/**
+ * Snaps an inlay length to the smallest Gridfinity-compatible interior dimension
+ * that is >= lengthMm. Interior = n×42 − 0.5 − 2×1.8.
+ */
+export function snapToGridfinityLength(lengthMm) {
+  const n = Math.ceil((lengthMm + GRIDFINITY_SPACER + 2 * GRIDFINITY_WALL_THICKNESS) / GRIDFINITY_UNIT);
+  return Math.max(1, n) * GRIDFINITY_UNIT - GRIDFINITY_SPACER - 2 * GRIDFINITY_WALL_THICKNESS;
+}
+
+/**
+ * Snaps a bin height to the next multiple of the Gridfinity height unit (7 mm).
+ */
+export function snapToGridfinityHeight(heightMm) {
+  return Math.ceil(heightMm / GRIDFINITY_HEIGHT_UNIT) * GRIDFINITY_HEIGHT_UNIT;
 }
 
 export function makeDefaultGroup(index) {
