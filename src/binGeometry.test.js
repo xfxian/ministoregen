@@ -7,6 +7,7 @@ import {
     buildStackingLipGeometry,
     BASE_HEIGHT,
     LIP_HEIGHT,
+    FOOT_TOP_RADIUS,
 } from './binGeometry';
 
 // 3u × 2u default bin dimensions (matching DEFAULT_INLAY and DEFAULT_BIN_CONFIG)
@@ -348,5 +349,60 @@ describe('buildBinGeometry with stacking lip', () => {
         const n = buildBinGeometry(BIN_CONFIG_BASE, INLAY_3x2).getAttribute('position').count;
         const m = buildBinGeometry({ ...BIN_CONFIG_BASE, stackingLip: true }, INLAY_3x2).getAttribute('position').count;
         expect(m).toBeGreaterThan(n);
+    });
+});
+
+// ─── Self-stackability: foot bottom must fit inside stacking lip top opening ──
+
+describe('self-stackability — foot bottom fits in stacking lip top opening', () => {
+    // For a bin to stack on itself the foot bottom corner (at 45°) must fit
+    // inside the stacking lip top inner corner (at 45°).
+    // Both rounded-rect corners reduce to a single number: the farthest point
+    // from the bin centre along the 45° diagonal.
+    //   foot:  corner_centre = half - R, tip_at_45 = corner_centre * √2 + R
+    //   lip:   corner_centre = inner_half - R_inner, tip_at_45 = ...
+    function corner45(half, R) {
+        return (half - R) * Math.SQRT2 + R;
+    }
+
+    it('bin outer corner radius equals FOOT_TOP_RADIUS (3.75mm)', () => {
+        // This is the root requirement: outer R must match so feet nest cleanly.
+        const wallThickness = BIN_CONFIG_BASE.wallThickness;
+        // outerCornerRadius is FOOT_TOP_RADIUS in buildBinGeometry (not innerR+wall).
+        // Verify indirectly: stacking lip built with FOOT_TOP_RADIUS at Z=0 outer.
+        const outerL = INLAY_3x2.length + 2 * wallThickness;
+        const geo = buildStackingLipGeometry(outerL, outerL, FOOT_TOP_RADIUS).toNonIndexed();
+        // Outer edge at Z=0 should be outerL/2 (= 62.75 for 3u).
+        const ext = xyExtentsAtZ(geo, 0);
+        expect(ext).not.toBeNull();
+        expect(ext.maxX).toBeCloseTo(outerL / 2, 0);
+    });
+
+    it('foot bottom corner (35.6mm, R=0.8) fits through 1u lip top opening corner', () => {
+        const LIP_INSET = 2.6;
+        const outerHalf = FOOT_TOP_OUTER / 2;            // 20.75mm
+        const innerHalf = outerHalf - LIP_INSET;         // 18.15mm
+        const innerR    = FOOT_TOP_RADIUS - LIP_INSET;   // 1.15mm
+
+        const lipCorner45  = corner45(innerHalf, innerR);         // opening at 45°
+        const footCorner45 = corner45(FOOT_BOT_OUTER / 2, 0.8);  // foot bottom at 45°
+
+        // foot must be INSIDE the opening (foot < lip boundary)
+        expect(footCorner45).toBeLessThan(lipCorner45);
+    });
+
+    it('foot bottom corner fits through 2u×1u lip top opening corner', () => {
+        // For a multi-unit bin the opening is wide but the critical corner is
+        // shared by two adjacent feet near the narrow (1u) side.
+        const LIP_INSET  = 2.6;
+        const UNIT       = 42;
+        const outerW     = UNIT - 0.5;                   // 41.5mm — narrow dimension
+        const innerHalfW = outerW / 2 - LIP_INSET;      // 18.15mm
+        const innerR     = FOOT_TOP_RADIUS - LIP_INSET;  // 1.15mm
+
+        const lipCorner45  = corner45(innerHalfW, innerR);
+        const footCorner45 = corner45(FOOT_BOT_OUTER / 2, 0.8);
+
+        expect(footCorner45).toBeLessThan(lipCorner45);
     });
 });

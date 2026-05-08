@@ -8,7 +8,7 @@ const GRIDFINITY_UNIT = 42;           // mm per gridfinity unit
 const FOOT_TOP_OUTER = 41.5;          // = GRIDFINITY_UNIT - 0.5mm spacer
 const FOOT_MID_OUTER = 37.2;          // FOOT_TOP_OUTER - 4.3
 const FOOT_BOT_OUTER = 35.6;          // FOOT_TOP_OUTER - 5.9
-const FOOT_TOP_RADIUS = 3.75;
+export const FOOT_TOP_RADIUS = 3.75;
 const FOOT_MID_RADIUS = 1.6;          // FOOT_TOP_RADIUS - 2.15
 const FOOT_BOT_RADIUS = 0.8;          // FOOT_MID_RADIUS - 0.8
 const BASE_BOTTOM_CHAMFER = 0.8;
@@ -237,10 +237,12 @@ export function buildBinGeometry(binConfig, inlayConfig) {
     const { wallThickness, floorThickness, heightMm, stackingLip, baseFeet, cornerSegments = 32 } = binConfig;
     const innerL = inlayConfig.length;
     const innerW = inlayConfig.width;
-    const innerCornerRadius = inlayConfig.cornerRadius;
     const outerL = innerL + 2 * wallThickness;
     const outerW = innerW + 2 * wallThickness;
-    const outerCornerRadius = innerCornerRadius + wallThickness;
+    // Outer corner radius is fixed to FOOT_TOP_RADIUS so the stacking lip opening
+    // accepts the feet corners, and the foot-to-wall transition is seamless.
+    const outerCornerRadius = FOOT_TOP_RADIUS;
+    const innerCornerRadius = Math.max(0, FOOT_TOP_RADIUS - wallThickness);
 
     // Wall height accounts for base foot, floor, and optional stacking lip
     const wallHeight = heightMm - BASE_HEIGHT - floorThickness - (stackingLip ? LIP_HEIGHT : 0);
