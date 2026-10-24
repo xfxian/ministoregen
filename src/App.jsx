@@ -1,326 +1,175 @@
-import { Tune as TuneIcon } from '@mui/icons-material';
 import {
-  AppBar,
-  Box,
-  Button,
-  CssBaseline,
-  Dialog,
-  DialogActions,
-  DialogContent,
-  DialogContentText,
-  DialogTitle,
-  Drawer,
-  Fab,
-  Toolbar,
-  Typography,
-  useMediaQuery,
+  Download, LibraryBooks, Redo, Save, Share, Undo,
+} from '@mui/icons-material';
+import {
+  AppBar, Box, Button, CssBaseline, Divider, IconButton, Menu, MenuItem, Snackbar, TextField, Toolbar, Tooltip,
+  Typography, useMediaQuery,
 } from '@mui/material';
 import { createTheme, ThemeProvider } from '@mui/material/styles';
-import { useRef, useState } from 'react';
-import { Mesh } from 'three';
-import { STLExporter } from 'three/examples/jsm/exporters/STLExporter.js';
+import { useMemo, useRef, useState } from 'react';
 import './App.css';
-import { DEFAULT_BIN_CONFIG, DEFAULT_INLAY, DEFAULT_SECTION, DRAWER_WIDTH, GRIDFINITY_HEIGHT_UNIT } from './config';
-import { calcBinHeightFromGroups, calcMinSectionLength, groupsToSections, snapToGridfinityHeight, snapToGridfinityLength } from './utils/wizardMath';
-import ModelPreview from './ModelPreview';
-import Sidebar from './components/Sidebar';
-import SplitButton from './components/SplitButton';
+import AdvancedSettings from './components/AdvancedSettings';
+import BinStep from './components/BinStep';
+import FitCheck from './components/FitCheck';
+import GroupsStep from './components/GroupsStep';
+import LibraryDialog from './components/LibraryDialog';
+import Viewport from './components/Viewport';
+import { downloadStl, slugify } from './export';
+import { planProject } from './model/layout';
+import { makeDefaultProject } from './model/project';
+import { saveDesign } from './state/library';
+import { setName } from './state/updates';
+import { shareUrl, useProject } from './state/useProject';
 
-function App() {
-  const [modelConfig, setModelConfig] = useState({
-    inlay: { ...DEFAULT_INLAY },
-    base: {
-      sections: [{ share: 100, ...DEFAULT_SECTION }]
-    }
-  });
-
-  const handleInlayConfigChange = (field, value) => {
-    setModelConfig((prev) => ({ ...prev, inlay: { ...prev.inlay, [field]: value } }));
-  };
-
-  const handleBaseSectionConfigChange = (section, field, value) => {
-    setModelConfig((prev) => {
-      const updated = prev.base.sections.map((s, i) =>
-        i === section ? { ...s, [field]: value } : s
-      );
-      return { ...prev, base: { ...prev.base, sections: redistributeSectionShares(updated, section) } };
-    });
-  };
-
-  const handleBaseSectionAdd = (afterIndex) => {
-    setModelConfig((prev) => {
-      const newSection = { share: prev.base.sections[afterIndex].share, ...DEFAULT_SECTION };
-      const updated = [
-        ...prev.base.sections.slice(0, afterIndex + 1),
-        newSection,
-        ...prev.base.sections.slice(afterIndex + 1),
-      ];
-      return { ...prev, base: { ...prev.base, sections: redistributeSectionShares(updated) } };
-    });
-  };
-
-  const handleBaseSectionRemove = (removeIndex) => {
-    setModelConfig((prev) => {
-      const updated = prev.base.sections.filter((_, i) => i !== removeIndex);
-      return { ...prev, base: { ...prev.base, sections: redistributeSectionShares(updated) } };
-    });
-    // Keep selectedSection in bounds
-    setSelectedSection((prev) => {
-      if (prev === null) return null;
-      const newLength = modelConfig.base.sections.length - 1;
-      return prev >= newLength ? Math.max(0, newLength - 1) : prev;
-    });
-  };
-
-  const redistributeSectionShares = (sections, skipIndex = -1) => {
-    const total = sections.reduce((sum, s) => sum + s.share, 0);
-    const skipShare = sections[skipIndex]?.share || 0;
-    return sections.map((s, i) => {
-      if (i === skipIndex) return s;
-      return { ...s, share: (s.share / (total - skipShare)) * (100 - skipShare) };
-    });
-  };
-
-  const [binConfig, setBinConfig] = useState({ ...DEFAULT_BIN_CONFIG });
-  const [binHeightUnit, setBinHeightUnit] = useState('mm');
-
-  const handleBinConfigChange = (field, value) => {
-    if (field === 'baseFeet' && miniatureGroups.length > 0) {
-      setBinConfig((prev) => {
-        const newConfig = { ...prev, [field]: value };
-        const newHeight = calcBinHeightFromGroups(miniatureGroups, newConfig.floorThickness, newConfig.baseFeet);
-        if (newHeight !== null) {
-          newConfig.heightMm = value ? snapToGridfinityHeight(newHeight) : newHeight;
-        }
-        return newConfig;
-      });
-      setModelConfig((prev) => {
-        const SPACING = 1, CLEARANCE = 0.4;
-        const widthForCalc = prev.inlay.width - prev.inlay.clearance;
-        const stripLengths = miniatureGroups.map((g) =>
-          calcMinSectionLength(g.count, widthForCalc, g.baseSizeX, g.baseSizeY, SPACING, CLEARANCE, prev.inlay.margin)
-        );
-        const totalStrip = stripLengths.reduce((a, b) => a + b, 0);
-        const rawLength = totalStrip + prev.inlay.clearance + 2 * prev.inlay.margin;
-        const totalLength = value ? snapToGridfinityLength(rawLength) : rawLength;
-        return { ...prev, inlay: { ...prev.inlay, length: totalLength } };
-      });
-      return;
-    }
-    setBinConfig((prev) => ({ ...prev, [field]: value }));
-  };
-
-  const handleBinHeightUnitChange = (value) => {
-    setBinHeightUnit(value);
-    if (value === 'u') {
-      handleBinConfigChange(
-        'heightMm',
-        Math.round(binConfig.heightMm / GRIDFINITY_HEIGHT_UNIT) * GRIDFINITY_HEIGHT_UNIT || GRIDFINITY_HEIGHT_UNIT
-      );
-    }
-  };
-
-  const [previewConfig, setPreviewConfig] = useState({ wireframe: false, color: '#808080' });
-
-  const [miniatureGroups, setMiniatureGroups] = useState([]);
-  const [showMiniatureCylinders, setShowMiniatureCylinders] = useState(true);
-
-  const handlePreviewConfigChange = (field, value) => {
-    setPreviewConfig((prev) => ({ ...prev, [field]: value }));
-  };
-
-  const [inlayMode, setInlayMode] = useState('gridfinity');
-  const [baseMode, setBaseMode] = useState('40k');
-
-  const [selectedSection, setSelectedSection] = useState(0);
-
-  // Mobile drawer
-  const isMobile = useMediaQuery('(max-width:900px)');
-  const [drawerOpen, setDrawerOpen] = useState(false);
-
-  // Export alert
-  const [openAlert, setOpenAlert] = useState(false);
-
-  // Refs to access meshes
-  const modelRef = useRef();
-  const binRef = useRef();
-
-  const exportMesh = (meshRef, filename) => {
-    const mesh = meshRef.current;
-    if (!mesh) { setOpenAlert(true); return false; }
-    const tempMesh = new Mesh(mesh.geometry);
-    const stlBinary = new STLExporter().parse(tempMesh, { binary: true });
-    const blob = new Blob([stlBinary], { type: 'application/octet-stream' });
-    const link = document.createElement('a');
-    link.href = URL.createObjectURL(blob);
-    link.download = filename;
-    link.click();
-    return true;
-  };
-
-  const handleExportInlay = () => exportMesh(modelRef, 'inlay.stl');
-  const handleExportBin = () => exportMesh(binRef, 'bin.stl');
-  const handleExportBoth = () => {
-    if (exportMesh(modelRef, 'inlay.stl')) {
-      setTimeout(() => exportMesh(binRef, 'bin.stl'), 100);
-    }
-  };
-
-  return (
-    <ThemeProvider theme={darkTheme}>
-      <CssBaseline />
-      <div className="App">
-        <AppBar position="fixed" sx={{ zIndex: isMobile ? 'auto' : (theme) => theme.zIndex.drawer + 1 }}>
-          <Toolbar variant={isMobile ? 'dense' : 'regular'}>
-            <Typography
-              variant={isMobile ? 'subtitle1' : 'h5'}
-              noWrap
-              component="div"
-              sx={{ flexGrow: 1, fontWeight: 600 }}
-            >
-              {isMobile ? 'Storage Generator' : 'Miniature Storage Generator'}
-            </Typography>
-            <SplitButton
-              onDownloadAll={handleExportBoth}
-              onDownloadBin={handleExportBin}
-              onDownloadInlay={handleExportInlay}
-              binEnabled={binConfig.enabled}
-              compact={isMobile}
-            />
-          </Toolbar>
-        </AppBar>
-
-        <Drawer
-          variant={isMobile ? 'temporary' : 'permanent'}
-          open={isMobile ? drawerOpen : true}
-          onClose={() => setDrawerOpen(false)}
-          sx={{
-            width: isMobile ? '100vw' : DRAWER_WIDTH,
-            flexShrink: 0,
-            [`& .MuiDrawer-paper`]: {
-              width: isMobile ? '100vw' : DRAWER_WIDTH,
-              boxSizing: 'border-box',
-              overflowX: 'hidden',
-              overflowY: 'hidden',
-              display: 'flex',
-              flexDirection: 'column',
-            },
-          }}
-        >
-          {/* On desktop: spacer so content clears the fixed AppBar */}
-          {!isMobile && <Toolbar />}
-          <Box sx={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column', backgroundColor: 'background.default' }}>
-            <Sidebar
-              modelConfig={modelConfig}
-              binConfig={binConfig}
-              binHeightUnit={binHeightUnit}
-              previewConfig={previewConfig}
-              inlayMode={inlayMode}
-              baseMode={baseMode}
-              selectedSection={selectedSection}
-              isMobile={isMobile}
-              miniatureGroups={miniatureGroups}
-              showMiniatureCylinders={showMiniatureCylinders}
-              onClose={() => setDrawerOpen(false)}
-              onInlayConfigChange={handleInlayConfigChange}
-              onBaseSectionConfigChange={handleBaseSectionConfigChange}
-              onBaseSectionAdd={handleBaseSectionAdd}
-              onBaseSectionRemove={handleBaseSectionRemove}
-              onBinConfigChange={handleBinConfigChange}
-              onBinHeightUnitChange={handleBinHeightUnitChange}
-              onPreviewConfigChange={handlePreviewConfigChange}
-              onInlayModeChange={setInlayMode}
-              onBaseModeChange={setBaseMode}
-              onSelectSection={setSelectedSection}
-              onMiniatureGroupsChange={(groups) => {
-                setMiniatureGroups(groups);
-                const sections = groupsToSections(groups);
-                if (sections) {
-                  setModelConfig((prev) => {
-                    const SPACING = 1, CLEARANCE = 0.4;
-                    // hexagonalLayout receives widthWithClearance, not raw inlay.width
-                    const widthForCalc = prev.inlay.width - prev.inlay.clearance;
-                    // Each value is a *strip* length (what hexagonalLayout will receive).
-                    // The caller must add clearance + 2×margin to get inlay.length.
-                    const stripLengths = groups.map((g) =>
-                      calcMinSectionLength(
-                        g.count, widthForCalc,
-                        g.baseSizeX, g.baseSizeY,
-                        SPACING, CLEARANCE, prev.inlay.margin
-                      )
-                    );
-                    const totalStrip = stripLengths.reduce((a, b) => a + b, 0);
-                    const rawLength = totalStrip + prev.inlay.clearance + 2 * prev.inlay.margin;
-                    const totalLength = binConfig.baseFeet ? snapToGridfinityLength(rawLength) : rawLength;
-                    const sectionsWithLayout = sections.map((s, i) => ({
-                      ...s,
-                      share: (stripLengths[i] / totalStrip) * 100,
-                    }));
-                    return {
-                      ...prev,
-                      inlay: { ...prev.inlay, length: totalLength },
-                      base: { ...prev.base, sections: sectionsWithLayout },
-                    };
-                  });
-                  setBinConfig((prev) => {
-                    const newHeight = calcBinHeightFromGroups(groups, prev.floorThickness, prev.baseFeet);
-                    if (newHeight === null) return prev;
-                    const snappedHeight = prev.baseFeet ? snapToGridfinityHeight(newHeight) : newHeight;
-                    return { ...prev, heightMm: snappedHeight, enabled: true };
-                  });
-                }
-              }}
-              onShowMiniatureCylindersChange={setShowMiniatureCylinders}
-            />
-          </Box>
-        </Drawer>
-
-        {/* Mobile FAB to open sidebar */}
-        {isMobile && (
-          <Fab
-            color="primary"
-            sx={{ position: 'fixed', bottom: 16, right: 16, zIndex: 1200 }}
-            onClick={() => setDrawerOpen(true)}
-          >
-            <TuneIcon />
-          </Fab>
-        )}
-
-        {/* Export error dialog */}
-        <Dialog open={openAlert} onClose={() => setOpenAlert(false)}>
-          <DialogTitle>Export Error</DialogTitle>
-          <DialogContent>
-            <DialogContentText>
-              The mesh could not be found. Please ensure the 3D model is loaded correctly before exporting.
-            </DialogContentText>
-          </DialogContent>
-          <DialogActions>
-            <Button onClick={() => setOpenAlert(false)} autoFocus>OK</Button>
-          </DialogActions>
-        </Dialog>
-
-        {/* Canvas */}
-        <div className="canvas-container">
-          <ModelPreview
-            modelRef={modelRef}
-            binRef={binRef}
-            modelConfig={modelConfig}
-            binConfig={binConfig}
-            previewConfig={previewConfig}
-            selectedSection={selectedSection}
-            showMiniatureCylinders={showMiniatureCylinders}
-          />
-        </div>
-      </div>
-    </ThemeProvider>
-  );
-}
-
-const darkTheme = createTheme({
-  palette: { mode: 'dark' },
+const theme = createTheme({
+  palette: { mode: 'dark', background: { default: '#101317', paper: '#171b21' } },
   typography: {
     fontFamily: 'system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
   },
 });
+
+function Step({ number, title, children }) {
+  return (
+    <Box component="section" sx={{ px: 2, py: 2 }}>
+      <Typography variant="subtitle1" fontWeight={700} sx={{ mb: 1.5 }}>
+        <Box component="span" sx={{ color: 'primary.main', mr: 1 }}>{number}</Box>{title}
+      </Typography>
+      {children}
+    </Box>
+  );
+}
+
+function App() {
+  const { project, update, undo, redo, canUndo, canRedo } = useProject();
+  const plan = useMemo(() => planProject(project), [project]);
+  const [view, setView] = useState('3d');
+  const [highlightId, setHighlightId] = useState(null);
+  const [libraryOpen, setLibraryOpen] = useState(false);
+  const [libraryId, setLibraryId] = useState(null);
+  const [downloadAnchor, setDownloadAnchor] = useState(null);
+  const [toast, setToast] = useState(null);
+  const binRef = useRef();
+  const inlayRef = useRef();
+  const isMobile = useMediaQuery('(max-width:900px)');
+
+  const base = slugify(project.name);
+  const download = (which) => {
+    setDownloadAnchor(null);
+    const ok = which === 'inlay'
+      ? downloadStl(inlayRef.current, `${base}-inlay.stl`)
+      : downloadStl(binRef.current, `${base}-bin.stl`);
+    if (!ok) setToast('The model is still loading. Try again in a moment.');
+  };
+
+  const save = (asNew) => {
+    try {
+      const id = saveDesign(project, asNew ? undefined : libraryId ?? undefined);
+      setLibraryId(id);
+      setToast(`Saved "${project.name}" to the library.`);
+    } catch {
+      setToast('Could not save: browser storage is unavailable.');
+    }
+  };
+
+  const share = async () => {
+    const url = shareUrl(project);
+    try {
+      await navigator.clipboard.writeText(url);
+      setToast('Link copied. Anyone with it can open this design.');
+    } catch {
+      window.prompt('Copy this link:', url);
+    }
+  };
+
+  const panel = (
+    <Box sx={{ overflowY: 'auto', height: '100%' }}>
+      <Step number="1" title="What are you storing?">
+        <GroupsStep project={project} plan={plan} onUpdate={update} onHover={setHighlightId} />
+      </Step>
+      <Divider />
+      <Step number="2" title="Bin">
+        <BinStep project={project} plan={plan} onUpdate={update} />
+      </Step>
+      <Divider />
+      <Step number="3" title="Fit check">
+        <FitCheck plan={plan} onUpdate={update} />
+      </Step>
+      <Divider />
+      <Box sx={{ px: 2, pb: 2 }}>
+        <AdvancedSettings project={project} onUpdate={update} />
+      </Box>
+    </Box>
+  );
+
+  return (
+    <ThemeProvider theme={theme}>
+      <CssBaseline />
+      <Box sx={{ display: 'flex', flexDirection: 'column', height: '100dvh' }}>
+        <AppBar position="static" elevation={0} sx={{ borderBottom: 1, borderColor: 'divider', bgcolor: 'background.paper' }}>
+          <Toolbar variant="dense" sx={{ gap: 1, minHeight: 56 }}>
+            {!isMobile && (
+              <Typography variant="subtitle1" fontWeight={700} noWrap sx={{ mr: 2 }}>Miniature Storage Generator</Typography>
+            )}
+            <TextField
+              variant="standard"
+              value={project.name}
+              onChange={(e) => update(setName(e.target.value))}
+              inputProps={{ 'aria-label': 'Design name' }}
+              sx={{ flexGrow: 1, maxWidth: 320 }}
+            />
+            <Box sx={{ flexGrow: 1 }} />
+            <Tooltip title="Undo (Ctrl+Z)"><span><IconButton size="small" onClick={undo} disabled={!canUndo} aria-label="Undo"><Undo fontSize="small" /></IconButton></span></Tooltip>
+            <Tooltip title="Redo (Ctrl+Shift+Z)"><span><IconButton size="small" onClick={redo} disabled={!canRedo} aria-label="Redo"><Redo fontSize="small" /></IconButton></span></Tooltip>
+            <Tooltip title="Library"><IconButton size="small" onClick={() => setLibraryOpen(true)} aria-label="Library"><LibraryBooks fontSize="small" /></IconButton></Tooltip>
+            <Tooltip title={libraryId ? 'Save changes to the library' : 'Save to the library'}>
+              <IconButton size="small" onClick={() => save(false)} aria-label="Save"><Save fontSize="small" /></IconButton>
+            </Tooltip>
+            <Tooltip title="Copy a link to this design"><IconButton size="small" onClick={share} aria-label="Share"><Share fontSize="small" /></IconButton></Tooltip>
+            <Button
+              variant="contained"
+              size="small"
+              startIcon={<Download />}
+              onClick={(e) => (plan.inlay ? setDownloadAnchor(e.currentTarget) : download('bin'))}
+              sx={{ ml: 1, whiteSpace: 'nowrap' }}
+            >
+              {isMobile ? 'STL' : 'Download STL'}
+            </Button>
+            <Menu anchorEl={downloadAnchor} open={Boolean(downloadAnchor)} onClose={() => setDownloadAnchor(null)}>
+              <MenuItem onClick={() => download('bin')}>Bin</MenuItem>
+              <MenuItem onClick={() => download('inlay')}>Inlay</MenuItem>
+            </Menu>
+          </Toolbar>
+        </AppBar>
+
+        <Box sx={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: isMobile ? 'column' : 'row' }}>
+          {isMobile ? (
+            <>
+              <Box sx={{ height: '45dvh', flexShrink: 0 }}>
+                <Viewport project={project} plan={plan} view={view} onViewChange={setView} onUpdate={update} highlightId={highlightId} binRef={binRef} inlayRef={inlayRef} />
+              </Box>
+              <Box sx={{ flex: 1, minHeight: 0, borderTop: 1, borderColor: 'divider' }}>{panel}</Box>
+            </>
+          ) : (
+            <>
+              <Box sx={{ width: 400, flexShrink: 0, borderRight: 1, borderColor: 'divider', bgcolor: 'background.paper' }}>{panel}</Box>
+              <Box sx={{ flex: 1, minWidth: 0 }}>
+                <Viewport project={project} plan={plan} view={view} onViewChange={setView} onUpdate={update} highlightId={highlightId} binRef={binRef} inlayRef={inlayRef} />
+              </Box>
+            </>
+          )}
+        </Box>
+      </Box>
+
+      <LibraryDialog
+        open={libraryOpen}
+        onClose={() => setLibraryOpen(false)}
+        currentId={libraryId}
+        onOpenDesign={(d) => { update(d.project); setLibraryId(d.id); setLibraryOpen(false); }}
+        onNewDesign={() => { update(makeDefaultProject()); setLibraryId(null); setLibraryOpen(false); }}
+      />
+      <Snackbar open={Boolean(toast)} autoHideDuration={3500} onClose={() => setToast(null)} message={toast} />
+    </ThemeProvider>
+  );
+}
 
 export default App;

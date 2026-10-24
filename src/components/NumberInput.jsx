@@ -9,6 +9,7 @@ import {
   OutlinedInput,
   TextField,
 } from '@mui/material';
+import { useId } from 'react';
 
 /**
  * A number input with explicit −/+ stepper buttons.
@@ -32,6 +33,8 @@ function NumberInput({
   children,
   slotProps,
 }) {
+  const inputId = useId();
+
   if (select) {
     return (
       <TextField
@@ -57,13 +60,13 @@ function NumberInput({
 
   return (
     <FormControl fullWidth={fullWidth} margin={margin} variant="outlined">
-      <InputLabel shrink htmlFor={`ni-${label}`}>{label}</InputLabel>
+      <InputLabel shrink htmlFor={inputId}>{label}</InputLabel>
       <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mt: 2.5 }}>
         <IconButton size="small" onClick={() => emit(parseFloat(value) - step)} disabled={disabled}>
           <Remove fontSize="small" />
         </IconButton>
         <OutlinedInput
-          id={`ni-${label}`}
+          id={inputId}
           value={value}
           onChange={onChange}
           endAdornment={unit && <InputAdornment position="end">{unit}</InputAdornment>}

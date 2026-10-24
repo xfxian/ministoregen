@@ -1,23 +1,7 @@
-/* App.css */
-.App {
-  display: flex;
-  height: 100vh;
-}
-
-.canvas-container {
-  flex: 1;
-  position: relative;
-}
-
-.canvas-container canvas {
-  width: 100%;
+html, body, #root {
   height: 100%;
 }
 
-/* Mobile: canvas fills full viewport, sidebar is a temporary overlay */
-@media (max-width: 900px) {
-  .canvas-container {
-    width: 100vw;
-    height: 100vh;
-  }
+body {
+  overscroll-behavior: none;
 }

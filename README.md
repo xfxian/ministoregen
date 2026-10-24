@@ -6,19 +6,22 @@ Live at: https://xfxian.github.io/ministoregen
 
 ## Features
 
-- **Inlay configuration**: Set length, width, corner radius, depth, margin, and printing clearance
-- **Gridfinity mode**: Select standard Gridfinity bin dimensions by unit count
-- **Multi-section support**: Divide the inlay into sections with different hole sizes (e.g. 25mm and 32mm bases side-by-side)
-- **Hexagonal packing**: Holes are automatically laid out in a hex grid for maximum density
-- **Bezier ellipse holes**: Configurable curvature factor for a precise fit
-- **3D preview**: Interactive Three.js viewport with color picker and wireframe mode
-- **STL export**: Download the model for direct use in your slicer
+- **Start from your collection**: list groups of miniatures (base shape and size, count, height); the bin size, height and pocket layout follow
+- **Gridfinity bins** that stack: spec foot profile, stacking lip and 7 mm height units, built as one watertight solid
+- **Two pocket modes**: a drop-in inlay that passes through the stacking lip, or pockets cut straight into the bin floor
+- **Round, oval, square and rectangular bases** with game presets; staggered or straight packing, whichever fits more
+- **Fit check** with warnings and one-click fixes (too tall, does not fit, base wider than the bin)
+- **3D, top and cut-away views**, with optional stand-ins for the miniatures
+- **Library** of saved designs in the browser, with export and import as a file
+- **Share link** that carries the whole design; undo and redo
+- **STL export** for the bin and the inlay
 
 ## Tech stack
 
 - [React](https://react.dev/) + [Vite](https://vite.dev/)
 - [Three.js](https://threejs.org/) via [@react-three/fiber](https://r3f.docs.pmnd.rs/) and [@react-three/drei](https://github.com/pmndrs/drei)
 - [Material UI](https://mui.com/)
+- [manifold-3d](https://github.com/elalish/manifold) for solid geometry
 
 ## Development
 
@@ -35,14 +38,11 @@ npm run lint      # lint with ESLint
 
 ```
 src/
-  App.jsx               # app state, layout, STL export
-  ModelPreview.jsx      # three.js canvas (lights, camera, grid)
-  Inlay.jsx             # inlay geometry: rounded plate with hex-packed base holes
-  Bin.jsx               # renders the bin mesh
-  binGeometry.js        # Gridfinity bin geometry (feet, floor, walls, stacking lip)
-  config.js             # defaults and Gridfinity constants
-  components/           # sidebar, miniature wizard, inputs, download button
-  utils/                # section and wizard math
+  App.jsx               # layout, header actions (save, share, download)
+  model/                # project state, layout planner, pocket outlines (pure, tested)
+  geometry/             # Gridfinity shell and printable parts on manifold-3d (tested)
+  state/                # project state hook (undo, URL, local storage) and the design library
+  components/           # panel steps, 3D viewport and scene, library dialog
 ```
 
 Contributor and agent workflow notes live in `AGENTS.md`.
