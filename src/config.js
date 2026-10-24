@@ -1,3 +1,5 @@
+import { DEFAULT_WALL, HEIGHT_UNIT, throatSize } from './geometry/gridfinity';
+
 export const DRAWER_WIDTH = 400;
 
 export const DEFAULT_SECTION = {
@@ -11,36 +13,30 @@ export const DEFAULT_SECTION = {
   color: '#e74c3c',
 };
 
+// Default inlay fits through the stacking lip of a 3×2 Gridfinity bin.
 export const DEFAULT_INLAY = {
-  length: 121.9,
-  width: 79.9,
+  length: throatSize(3),
+  width: throatSize(2),
   cornerRadius: 3.2,
   depth: 3,
   margin: 1,
-  clearance: 0.2
+  clearance: 0.5
 };
 
-// Gridfinity bin dimensions
-// Note: every bin manufacturer is slightly different; these values are a common baseline.
-export const GRIDFINITY_UNIT = 42;
-export const GRIDFINITY_SPACER = 0.5;
-export const GRIDFINITY_WALL_THICKNESS = 1.8;
-export const GRIDFINITY_HEIGHT_UNIT = 7; // mm per gridfinity height unit
+export const GRIDFINITY_HEIGHT_UNIT = HEIGHT_UNIT; // mm per Gridfinity height unit
 
 export const DEFAULT_BIN_CONFIG = {
   enabled: false,
-  wallThickness: 1.8,
+  wallThickness: DEFAULT_WALL,
   floorThickness: 1.2,
-  heightMm: 28, // 4 gridfinity height units
+  heightMm: 28, // 4 Gridfinity height units, including feet, excluding the stacking lip
   stackingLip: true,
-  baseFeet: false,
+  baseFeet: true,
   cornerSegments: 32,
 };
 
-export const GRIDFINITY_DIMENSION_OPTIONS = [1, 2, 3, 4, 5, 6, 7, 8].map(n => [
-  (n * GRIDFINITY_UNIT) - GRIDFINITY_SPACER - (2 * GRIDFINITY_WALL_THICKNESS),
-  n
-]);
+// Inlay sizes that fit through the stacking lip of a bin n units long.
+export const GRIDFINITY_DIMENSION_OPTIONS = [1, 2, 3, 4, 5, 6, 7, 8].map(n => [throatSize(n), n]);
 
 export const SELECT_ITEMS = {
   gridfinity: {
