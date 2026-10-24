@@ -1,5 +1,4 @@
-import { BASE_HEIGHT, LIP_HEIGHT } from '../binGeometry';
-import { GRIDFINITY_UNIT, GRIDFINITY_SPACER, GRIDFINITY_WALL_THICKNESS, GRIDFINITY_HEIGHT_UNIT } from '../config';
+import { HEIGHT_UNIT, cavityBottom, throatSize, unitsForInnerSize } from '../geometry/gridfinity';
 
 export const BASE_PRESETS = {
   round: [
@@ -22,13 +21,15 @@ export const BASE_PRESETS = {
 export const GROUP_COLORS = ['#e74c3c', '#3498db', '#2ecc71', '#f39c12', '#9b59b6', '#1abc9c'];
 
 /**
- * Returns the total bin height required to fit all groups (tallest wins).
+ * Returns the bin height (including feet, excluding the stacking lip) required
+ * to fit all groups (tallest wins). The stacking lip adds on top of this, as in
+ * the Gridfinity specification.
  * Returns null when groups is empty (caller should not override existing config).
  */
-export function calcBinHeightFromGroups(groups, floorThickness, stackingLip) {
+export function calcBinHeightFromGroups(groups, floorThickness, baseFeet) {
   if (groups.length === 0) return null;
   const tallest = Math.max(...groups.map((g) => g.heightMm));
-  return BASE_HEIGHT + floorThickness + tallest + (stackingLip ? LIP_HEIGHT : 0);
+  return cavityBottom({ feet: baseFeet, floor: floorThickness }) + tallest;
 }
 
 /**
@@ -100,19 +101,18 @@ export function groupsToSections(groups) {
 }
 
 /**
- * Snaps an inlay length to the smallest Gridfinity-compatible interior dimension
- * that is >= lengthMm. Interior = n×42 − 0.5 − 2×1.8.
+ * Snaps an inlay length to the smallest size that still passes through the
+ * stacking lip of a Gridfinity bin and is >= lengthMm.
  */
 export function snapToGridfinityLength(lengthMm) {
-  const n = Math.ceil((lengthMm + GRIDFINITY_SPACER + 2 * GRIDFINITY_WALL_THICKNESS) / GRIDFINITY_UNIT);
-  return Math.max(1, n) * GRIDFINITY_UNIT - GRIDFINITY_SPACER - 2 * GRIDFINITY_WALL_THICKNESS;
+  return throatSize(unitsForInnerSize(lengthMm));
 }
 
 /**
  * Snaps a bin height to the next multiple of the Gridfinity height unit (7 mm).
  */
 export function snapToGridfinityHeight(heightMm) {
-  return Math.ceil(heightMm / GRIDFINITY_HEIGHT_UNIT) * GRIDFINITY_HEIGHT_UNIT;
+  return Math.ceil(heightMm / HEIGHT_UNIT - 1e-9) * HEIGHT_UNIT;
 }
 
 export function makeDefaultGroup(index) {

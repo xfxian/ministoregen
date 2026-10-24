@@ -438,7 +438,7 @@ function Sidebar({
               <Grid size={6}>
                 <NumberInput
                   label="Wall Thickness"
-                  helperText="Thickness of bin walls"
+                  helperText="Gridfinity default: 0.95 mm"
                   value={binConfig.wallThickness}
                   onChange={(e) => onBinConfigChange('wallThickness', parseFloat(e.target.value) || 0)}
                   fullWidth
@@ -478,7 +478,7 @@ function Sidebar({
                   helperText={
                     binHeightUnit === 'u'
                       ? `1 unit = ${GRIDFINITY_HEIGHT_UNIT}mm`
-                      : 'Total bin height including floor'
+                      : 'Including feet, excluding the stacking lip'
                   }
                   value={
                     binHeightUnit === 'u'

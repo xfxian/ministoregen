@@ -88,7 +88,7 @@ function App() {
     if (field === 'baseFeet' && miniatureGroups.length > 0) {
       setBinConfig((prev) => {
         const newConfig = { ...prev, [field]: value };
-        const newHeight = calcBinHeightFromGroups(miniatureGroups, newConfig.floorThickness, newConfig.stackingLip);
+        const newHeight = calcBinHeightFromGroups(miniatureGroups, newConfig.floorThickness, newConfig.baseFeet);
         if (newHeight !== null) {
           newConfig.heightMm = value ? snapToGridfinityHeight(newHeight) : newHeight;
         }
@@ -263,7 +263,7 @@ function App() {
                     };
                   });
                   setBinConfig((prev) => {
-                    const newHeight = calcBinHeightFromGroups(groups, prev.floorThickness, prev.stackingLip);
+                    const newHeight = calcBinHeightFromGroups(groups, prev.floorThickness, prev.baseFeet);
                     if (newHeight === null) return prev;
                     const snappedHeight = prev.baseFeet ? snapToGridfinityHeight(newHeight) : newHeight;
                     return { ...prev, heightMm: snappedHeight, enabled: true };

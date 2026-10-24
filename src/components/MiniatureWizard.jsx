@@ -17,7 +17,7 @@ import {
   Tooltip,
   Typography,
 } from '@mui/material';
-import { BASE_HEIGHT, LIP_HEIGHT } from '../binGeometry';
+import { FOOT_HEIGHT, LIP_HEIGHT, LIP_TIP } from '../geometry/gridfinity';
 import NumberInput from './NumberInput';
 import { BASE_PRESETS, calcBinHeightFromGroups, makeDefaultGroup } from '../utils/wizardMath';
 
@@ -202,7 +202,7 @@ function MiniatureWizard({ groups, onChange, binConfig, showCylinders, onShowCyl
   const totalHeight = calcBinHeightFromGroups(
     groups,
     binConfig.floorThickness,
-    binConfig.stackingLip
+    binConfig.baseFeet
   );
 
   return (
@@ -244,7 +244,7 @@ function MiniatureWizard({ groups, onChange, binConfig, showCylinders, onShowCyl
           </Typography>
           <Box sx={{ mt: 0.5, mb: 1.5 }}>
             {binConfig.baseFeet && (
-              <HeightRow label="Base feet" value={BASE_HEIGHT} />
+              <HeightRow label="Base feet" value={FOOT_HEIGHT} />
             )}
             <HeightRow label="Floor" value={binConfig.floorThickness} />
             <HeightRow
@@ -252,11 +252,11 @@ function MiniatureWizard({ groups, onChange, binConfig, showCylinders, onShowCyl
               value={tallestGroup ? tallestGroup.heightMm : 0}
               highlight
             />
-            {binConfig.stackingLip && (
-              <HeightRow label="Stacking lip" value={LIP_HEIGHT} />
-            )}
             <Divider sx={{ my: 0.5 }} />
-            <HeightRow label="Total" value={totalHeight ?? 0} highlight />
+            <HeightRow label="Bin height" value={totalHeight ?? 0} highlight />
+            {binConfig.stackingLip && (
+              <HeightRow label="+ Stacking lip on top" value={LIP_HEIGHT - LIP_TIP} />
+            )}
           </Box>
         </>
       )}
