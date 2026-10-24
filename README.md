@@ -1,6 +1,6 @@
-# Miniature Storage Inlay Generator
+# ministoregen
 
-A web app for generating 3D-printable storage inlays for miniature figures. Configure the dimensions of your container (Gridfinity bins or custom), add sections with different base hole sizes, and export the model as an STL file ready for slicing.
+A web app that designs 3D-printable [Gridfinity](https://gridfinity.xyz/) bins for storing tabletop miniatures. List the miniatures you want to store, and it sizes the bin, lays out a pocket for every base and exports STL files ready for slicing. Everything runs in the browser; designs are saved locally, never on a server.
 
 Live at: https://xfxian.github.io/ministoregen
 
@@ -50,3 +50,11 @@ Contributor and agent workflow notes live in `AGENTS.md`.
 ## CI/CD
 
 Pull requests are linted, tested, built and get a preview deployment. Pushes to `main` deploy to GitHub Pages. Dependabot opens grouped dependency updates once a month.
+
+## Credits
+
+- Gridfinity is a modular storage system by Zack Freedman. Shell dimensions follow the [Gridfinity specification](https://gridfinity.xyz/specification/) as implemented by [gridfinity-rebuilt-openscad](https://github.com/kennetek/gridfinity-rebuilt-openscad) (MIT).
+
+## License
+
+[MIT](LICENSE)
