@@ -19,7 +19,6 @@ Live at: https://xfxian.github.io/ministoregen
 - [React](https://react.dev/) + [Vite](https://vite.dev/)
 - [Three.js](https://threejs.org/) via [@react-three/fiber](https://r3f.docs.pmnd.rs/) and [@react-three/drei](https://github.com/pmndrs/drei)
 - [Material UI](https://mui.com/)
-- [three-stdlib](https://github.com/pmndrs/three-stdlib) for STL export
 
 ## Development
 
@@ -36,13 +35,18 @@ npm run lint      # lint with ESLint
 
 ```
 src/
-  App.jsx          # main component: state, UI controls, STL export
-  ModelPreview.jsx # Three.js canvas setup (lights, camera, grid)
-  Inlay.jsx        # 3D geometry: rounded rect, bezier ellipse, hex layout
-  config.js        # shared constants (defaults, Gridfinity dimensions, base sizes)
-  setupTests.js    # vitest/jest-dom setup
+  App.jsx               # app state, layout, STL export
+  ModelPreview.jsx      # three.js canvas (lights, camera, grid)
+  Inlay.jsx             # inlay geometry: rounded plate with hex-packed base holes
+  Bin.jsx               # renders the bin mesh
+  binGeometry.js        # Gridfinity bin geometry (feet, floor, walls, stacking lip)
+  config.js             # defaults and Gridfinity constants
+  components/           # sidebar, miniature wizard, inputs, download button
+  utils/                # section and wizard math
 ```
+
+Contributor and workflow notes live in `CLAUDE.md`.
 
 ## CI/CD
 
-Pushes to `main` trigger a GitHub Actions workflow that lints, tests, builds, and deploys to GitHub Pages automatically.
+Pull requests are linted, tested, built and get a preview deployment. Pushes to `main` deploy to GitHub Pages. Dependabot opens grouped dependency updates once a month.
