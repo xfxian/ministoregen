@@ -24,6 +24,7 @@ describe.skipIf(!process.env.BENCH)('geometry timing', () => {
       inlay?.getMesh();
       const t2 = performance.now();
       const pockets = plan.strips.reduce((n, s) => n + s.capacity, 0);
+      // eslint-disable-next-line no-console -- timing output is the purpose of this test
       console.log(`${mode} ${segments} seg, ${plan.unitsX}x${plan.unitsY}, ${pockets} pockets: bin ${(t1 - t0).toFixed(0)} ms, inlay ${(t2 - t1).toFixed(0)} ms, ${bin.numTri()} tris`);
       bin.delete(); inlay?.delete();
     }
