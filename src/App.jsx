@@ -18,7 +18,7 @@ import {
 import { createTheme, ThemeProvider } from '@mui/material/styles';
 import { useRef, useState } from 'react';
 import { Mesh } from 'three';
-import { STLExporter } from 'three-stdlib';
+import { STLExporter } from 'three/examples/jsm/exporters/STLExporter.js';
 import './App.css';
 import { DEFAULT_BIN_CONFIG, DEFAULT_INLAY, DEFAULT_SECTION, DRAWER_WIDTH, GRIDFINITY_HEIGHT_UNIT } from './config';
 import { calcBinHeightFromGroups, calcMinSectionLength, groupsToSections, snapToGridfinityHeight, snapToGridfinityLength } from './utils/wizardMath';
@@ -318,6 +318,9 @@ function App() {
 
 const darkTheme = createTheme({
   palette: { mode: 'dark' },
+  typography: {
+    fontFamily: 'system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
+  },
 });
 
 export default App;
