@@ -45,7 +45,7 @@ src/
   utils/                # section and wizard math
 ```
 
-Contributor and workflow notes live in `CLAUDE.md`.
+Contributor and agent workflow notes live in `AGENTS.md`.
 
 ## CI/CD
 
