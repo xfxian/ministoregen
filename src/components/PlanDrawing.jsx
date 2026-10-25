@@ -1,12 +1,12 @@
 import { GRID_PITCH, LIP_DEPTH, OUTER_RADIUS, outerSize } from '../geometry/gridfinity';
-import { pocketOutline } from '../model/pockets';
+import { placeOutline, pocketOutline } from '../model/pockets';
 import { tokens } from '../theme';
 
 const fmt = (mm) => (Math.round(mm * 10) / 10).toString();
 
-function outlinePath(points, x, y) {
+function outlinePath(points) {
   // Model Y points up; SVG Y points down.
-  return `M${points.map(([px, py]) => `${(x + px).toFixed(2)},${(-(y + py)).toFixed(2)}`).join('L')}Z`;
+  return `M${points.map(([px, py]) => `${px.toFixed(2)},${(-py).toFixed(2)}`).join('L')}Z`;
 }
 
 function roundedRect(w, h, r, props) {
@@ -51,12 +51,12 @@ function PlanDrawing({ project, plan, detailed = false, highlightId = null, labe
         const dim = highlightId && highlightId !== group.id;
         return (
           <g key={group.id} opacity={dim ? 0.3 : 1}>
-            {positions.map(([x, y], i) => {
+            {positions.map((position, i) => {
               const spare = i >= group.count;
               return (
                 <path
-                  key={`${x},${y}`}
-                  d={outlinePath(outline, x, y)}
+                  key={`${position[0]},${position[1]}`}
+                  d={outlinePath(placeOutline(outline, position))}
                   style={stroke}
                   fill={spare ? 'none' : group.color}
                   fillOpacity={spare ? 0 : 0.14}

@@ -1,6 +1,5 @@
 import {
-  FOOT_HEIGHT, GRID_GAP, GRID_PITCH, HEIGHT_UNIT, LIP_HEIGHT, cavityBottom, minBodyHeight, outerSize, throatSize,
-  unitsForInnerSize,
+  FOOT_HEIGHT, HEIGHT_UNIT, LIP_HEIGHT, cavityBottom, minBodyHeight, outerSize, throatSize,
 } from '../geometry/gridfinity';
 
 /** When bins stack, the upper bin's feet reach this far below the lower bin's lip base. */
@@ -12,13 +11,25 @@ function pocketSize(group, layout) {
   return { dx: group.sizeX + layout.baseClearance, dy: group.sizeY + layout.baseClearance };
 }
 
+/** The same group with its base turned by 90°. */
+function turned(group) {
+  return { ...group, sizeX: group.sizeY, sizeY: group.sizeX };
+}
+
+/** Orientations worth trying: round and square bases look the same either way. */
+function orientations(group) {
+  return group.sizeX === group.sizeY ? [false] : [false, true];
+}
+
+const oriented = (group, rotated) => (rotated ? turned(group) : group);
+
 /**
- * Pocket centres for one group inside a strip of `stripLength` × `width` (already
- * inside the margin), centred on (0, centerY). Round and oval bases try both a
- * staggered (hex) and a straight grid and keep whichever holds more.
+ * Pocket centres for one group inside a `width` × `stripLength` rectangle centred on
+ * (centerX, centerY). Round and oval bases try both a staggered (hex) and a straight
+ * grid and keep whichever holds more.
  */
-export function layoutStrip(group, layout, stripLength, width, centerY = 0) {
-  const candidates = packings(group, layout).map((p) => arrange(p, stripLength, width, centerY));
+export function layoutStrip(group, layout, stripLength, width, centerY = 0, centerX = 0) {
+  const candidates = packings(group, layout).map((p) => arrange(p, stripLength, width, centerX, centerY));
   return candidates.reduce((best, c) => (c.length > best.length ? c : best), []);
 }
 
@@ -34,7 +45,7 @@ function countFit(size, pitch, available) {
   return available + 1e-9 < size ? 0 : Math.floor((available - size + 1e-9) / pitch) + 1;
 }
 
-function arrange({ dx, dy, colStep, rowStep, stagger }, stripLength, width, centerY) {
+function arrange({ dx, dy, colStep, rowStep, stagger }, stripLength, width, centerX, centerY) {
   const evenCols = countFit(dx, colStep, width);
   const oddCols = stagger ? countFit(dx, colStep, width - colStep / 2) : evenCols;
   const rows = countFit(dy, rowStep, stripLength);
@@ -48,28 +59,138 @@ function arrange({ dx, dy, colStep, rowStep, stagger }, stripLength, width, cent
   for (let r = 0; r < rows; r++) {
     const odd = stagger && r % 2 === 1;
     const cols = odd ? oddCols : evenCols;
-    const x0 = -patternWidth / 2 + (odd ? colStep / 2 : 0);
+    const x0 = centerX - patternWidth / 2 + (odd ? colStep / 2 : 0);
     const y = centerY - patternHeight / 2 + r * rowStep;
     for (let c = 0; c < cols; c++) positions.push([x0 + c * colStep, y]);
   }
   return positions;
 }
 
-/** Shortest strip that holds `group.count` pockets at the given width, or Infinity. */
-export function minStripLength(group, layout, width) {
+function fitCount(group, layout, width, length) {
+  return layoutStrip(group, layout, length, width).length;
+}
+
+/**
+ * Shortest strip that holds `count` pockets at the given width, or Infinity.
+ * The length includes one spacing gap towards the next strip.
+ */
+export function minStripLength(group, layout, width, count = group.count) {
   let best = Infinity;
   for (const p of packings(group, layout)) {
     for (let rows = 1; rows <= 500; rows++) {
       const length = (rows - 1) * p.rowStep + p.dy + layout.spacing;
       if (length >= best) break;
-      if (arrange(p, length, width, 0).length >= group.count) {
+      if (arrange(p, length, width, 0, 0).length >= count) {
         best = length;
         break;
       }
-      if (rows === 1 && arrange(p, length, width, 0).length === 0) break;
+      if (rows === 1 && arrange(p, length, width, 0, 0).length === 0) break;
     }
   }
   return best;
+}
+
+/** Narrowest width up to `maxWidth` that holds `count` pockets in a strip of `length`. */
+function minBlockWidth(group, layout, length, count, maxWidth) {
+  let lo = 0;
+  let hi = maxWidth;
+  for (let i = 0; i < 40 && hi - lo > 0.005; i++) {
+    const mid = (lo + hi) / 2;
+    if (fitCount(group, layout, mid, length) >= count) hi = mid;
+    else lo = mid;
+  }
+  return hi;
+}
+
+const largestSide = (g) => Math.max(g.sizeX, g.sizeY);
+
+/**
+ * Packs every group into a `width` × `length` area in shelves: each shelf runs across
+ * the full width, and blocks of pockets sit side by side in it. Large bases go first;
+ * smaller ones fill the room left next to them, turned by 90° where that fits more.
+ * A group that runs out of room keeps as many pockets as fit.
+ */
+function packArea(groups, layout, width, length) {
+  const order = groups.map((_, i) => i).sort((a, b) => largestSide(groups[b]) - largestSide(groups[a]) || a - b);
+  const shelves = [];
+  const placed = groups.map(() => 0);
+  let usedLength = 0;
+
+  for (const gi of order) {
+    const group = groups[gi];
+    let left = group.count;
+
+    // Room left next to blocks in shelves that already exist.
+    for (const shelf of shelves) {
+      if (left <= 0) break;
+      const free = width - shelf.used - layout.spacing;
+      if (free <= 0) continue;
+      let best = null;
+      for (const rotated of orientations(group)) {
+        const k = Math.min(left, fitCount(oriented(group, rotated), layout, free, shelf.length));
+        if (k > 0 && (!best || k > best.k)) best = { rotated, k };
+      }
+      if (!best) continue;
+      const w = minBlockWidth(oriented(group, best.rotated), layout, shelf.length, best.k, free);
+      shelf.blocks.push({ gi, rotated: best.rotated, k: best.k, width: w });
+      shelf.used += layout.spacing + w;
+      left -= best.k;
+    }
+
+    // New shelves for the rest.
+    while (left > 0) {
+      const room = length - usedLength;
+      let best = null;
+      for (const rotated of orientations(group)) {
+        const og = oriented(group, rotated);
+        const full = minStripLength(og, layout, width, left);
+        let option = null;
+        if (full <= room + 1e-9) {
+          option = { rotated, k: left, length: full };
+        } else {
+          const k = fitCount(og, layout, width, room);
+          if (k > 0) option = { rotated, k, length: minStripLength(og, layout, width, k) };
+        }
+        if (option && (!best || option.k > best.k || (option.k === best.k && option.length < best.length))) best = option;
+      }
+      if (!best) break;
+      const w = minBlockWidth(oriented(group, best.rotated), layout, best.length, best.k, width);
+      shelves.push({ length: best.length, used: w, blocks: [{ gi, rotated: best.rotated, k: best.k, width: w }] });
+      usedLength += best.length;
+      left -= best.k;
+    }
+    placed[gi] = group.count - left;
+  }
+  return { shelves, placed, usedLength, fits: placed.every((n, i) => n >= groups[i].count) };
+}
+
+/**
+ * Turns packed shelves into pocket positions. Leftover room is shared out between
+ * shelves and blocks, which can add spare pockets. Each group lists the pockets it
+ * needs first, then its spares; a position is [x, y, rotated].
+ */
+function placePockets(groups, layout, packed, width, length) {
+  const real = groups.map(() => []);
+  const spare = groups.map(() => []);
+  const scaleL = packed.usedLength > 0 ? length / packed.usedLength : 1;
+  let y = -length / 2;
+  for (const shelf of packed.shelves) {
+    const shelfLength = shelf.length * scaleL;
+    const blockSum = shelf.blocks.reduce((n, b) => n + b.width, 0);
+    const extra = width - shelf.used;
+    let x = -width / 2;
+    for (const block of shelf.blocks) {
+      const w = block.width + (extra * block.width) / blockSum;
+      const og = oriented(groups[block.gi], block.rotated);
+      const positions = layoutStrip(og, layout, shelfLength, w, y + shelfLength / 2, x + w / 2)
+        .map(([px, py]) => [px, py, block.rotated]);
+      real[block.gi].push(...positions.slice(0, block.k));
+      spare[block.gi].push(...positions.slice(block.k));
+      x += w + layout.spacing;
+    }
+    y += shelfLength;
+  }
+  return groups.map((_, i) => [...real[i], ...spare[i]]);
 }
 
 /**
@@ -86,29 +207,33 @@ function usableSize(units, bin, layout) {
   return areaSize(units, bin, layout) - 2 * layout.margin;
 }
 
-/** Smallest unit count whose area holds strips of the given total length. */
-function unitsForStrips(needs, bin, layout) {
-  const length = needs.reduce((a, b) => a + b, 0) + 2 * layout.margin;
-  if (layout.pocketMode === 'floor') {
-    return Math.max(1, Math.ceil((length + 2 * bin.wall + GRID_GAP - 1e-6) / GRID_PITCH));
-  }
-  return unitsForInnerSize(length + layout.inlayClearance);
+/**
+ * How much a footprint costs when choosing among bins that fit: its grid cells, plus a
+ * penalty for long thin bins, which waste room in a drawer and print fragile walls.
+ */
+export function footprintCost(unitsX, unitsY) {
+  const aspect = Math.max(unitsX, unitsY) / Math.min(unitsX, unitsY);
+  return unitsX * unitsY + 0.5 * Math.max(0, aspect - 2);
 }
 
 function chooseFootprint(groups, bin, layout) {
   if (!bin.autoFootprint) return { unitsX: bin.unitsX, unitsY: bin.unitsY, fitsOneBin: true };
-  let best = null;
+  const pocketArea = groups.reduce((n, g) => n + g.count * (g.sizeX + layout.baseClearance) * (g.sizeY + layout.baseClearance), 0);
+  const candidates = [];
   for (let ux = 1; ux <= bin.maxUnits; ux++) {
-    const needs = groups.map((g) => minStripLength(g, layout, usableSize(ux, bin, layout)));
-    if (needs.some((n) => !Number.isFinite(n))) continue;
-    const uy = unitsForStrips(needs, bin, layout);
-    if (uy > bin.maxUnits) continue;
-    // Smallest area first, then the squarer bin, then the one that is longer than wide.
-    const score = [ux * uy, Math.abs(ux - uy), ux > uy ? 1 : 0];
-    if (!best || compare(score, best.score) < 0) best = { unitsX: ux, unitsY: uy, score };
+    for (let uy = 1; uy <= bin.maxUnits; uy++) {
+      // Squarer first, then longer than wide.
+      candidates.push({ unitsX: ux, unitsY: uy, score: [footprintCost(ux, uy), Math.abs(ux - uy), ux > uy ? 1 : 0] });
+    }
   }
-  if (!best) return { unitsX: bin.maxUnits, unitsY: bin.maxUnits, fitsOneBin: false };
-  return { unitsX: best.unitsX, unitsY: best.unitsY, fitsOneBin: true };
+  candidates.sort((a, b) => compare(a.score, b.score));
+  for (const c of candidates) {
+    const w = usableSize(c.unitsX, bin, layout);
+    const l = usableSize(c.unitsY, bin, layout);
+    if (w * l < pocketArea) continue;
+    if (packArea(groups, layout, w, l).fits) return { unitsX: c.unitsX, unitsY: c.unitsY, fitsOneBin: true };
+  }
+  return { unitsX: bin.maxUnits, unitsY: bin.maxUnits, fitsOneBin: false };
 }
 
 function compare(a, b) {
@@ -143,26 +268,18 @@ export function planProject(project) {
   const usableW = area.width - 2 * layout.margin;
   const usableL = area.length - 2 * layout.margin;
 
-  const needs = groups.map((g) => minStripLength(g, layout, usableW));
-  const finiteNeeds = needs.map((n) => (Number.isFinite(n) ? n : 0));
-  const totalNeed = finiteNeeds.reduce((a, b) => a + b, 0);
-  const scale = totalNeed > 0 ? usableL / totalNeed : 0;
-  let cursor = -usableL / 2;
-  const strips = groups.map((group, i) => {
-    const length = finiteNeeds[i] * scale;
-    const centerY = cursor + length / 2;
-    cursor += length;
-    const positions = length > 0 ? layoutStrip(group, layout, length, usableW, centerY) : [];
-    return { group, centerY, length, positions, capacity: positions.length };
-  });
+  const packed = packArea(groups, layout, usableW, usableL);
+  const placements = placePockets(groups, layout, packed, usableW, usableL);
+  const strips = groups.map((group, i) => ({ group, positions: placements[i], capacity: placements[i].length }));
 
-  strips.forEach(({ group, capacity }, i) => {
-    if (!Number.isFinite(needs[i])) {
+  strips.forEach(({ group, capacity }) => {
+    const fitsAtAll = orientations(group).some((r) => fitCount(oriented(group, r), layout, usableW, usableL) > 0);
+    if (!fitsAtAll) {
       warnings.push({
         id: `wide-${group.id}`,
         severity: 'error',
         groupId: group.id,
-        text: `${group.name}: a ${group.sizeX} × ${group.sizeY} mm base is wider than this bin.`,
+        text: `${group.name}: a ${group.sizeX} × ${group.sizeY} mm base does not fit in this bin.`,
         fix: bin.autoFootprint ? undefined : { label: 'Size the bin automatically', bin: { autoFootprint: true } },
       });
     } else if (capacity < group.count) {

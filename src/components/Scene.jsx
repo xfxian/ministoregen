@@ -3,7 +3,7 @@ import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { buildBinPart, buildInlayPart } from '../geometry/parts';
 import { toBufferGeometry } from '../geometry/toBufferGeometry';
-import { pocketOutline } from '../model/pockets';
+import { placeOutline, pocketOutline } from '../model/pockets';
 
 // Keeps the left half of the model when the cut view is on, exposing the wall profile.
 const CUT_PLANE = new THREE.Plane(new THREE.Vector3(-1, 0, 0), 0);
@@ -48,11 +48,10 @@ function Part({ geometry, color, opacity, wireframe, cut, z = 0 }) {
 function PocketMarkers({ project, plan, highlightId, cut }) {
   const geometries = useMemo(() => plan.strips.map((s) => {
     if (!s.positions.length) return null;
-    const outline = pocketOutline(s.group, project.layout, 48);
-    const shape = new THREE.Shape(outline.map(([x, y]) => new THREE.Vector2(x * 0.92, y * 0.92)));
-    const base = new THREE.ShapeGeometry(shape);
-    const merged = mergeGeometries(s.positions.map(([x, y]) => base.clone().translate(x, y, 0)));
-    base.dispose();
+    const outline = pocketOutline(s.group, project.layout, 48).map(([x, y]) => [x * 0.92, y * 0.92]);
+    const parts = s.positions.map((p) => new THREE.ShapeGeometry(new THREE.Shape(placeOutline(outline, p).map(([x, y]) => new THREE.Vector2(x, y)))));
+    const merged = mergeGeometries(parts);
+    parts.forEach((g) => g.dispose());
     return { group: s.group, geometry: merged, dispose: () => merged.dispose() };
   }).filter(Boolean), [plan, project.layout]);
   useEffect(() => () => geometries.forEach((g) => g.dispose()), [geometries]);
@@ -73,7 +72,11 @@ function MiniGhosts({ plan, highlightId, cut }) {
     const base = shape === 'square' || shape === 'rect'
       ? new THREE.BoxGeometry(sizeX * 0.9, sizeY * 0.9, heightMm)
       : new THREE.CylinderGeometry(0.45, 0.45, heightMm, 24).rotateX(Math.PI / 2).scale(sizeX, sizeY, 1);
-    const merged = mergeGeometries(placed.map(([x, y]) => base.clone().translate(x, y, heightMm / 2)));
+    const merged = mergeGeometries(placed.map(([x, y, rotated]) => {
+      const g = base.clone();
+      if (rotated) g.rotateZ(Math.PI / 2);
+      return g.translate(x, y, heightMm / 2);
+    }));
     base.dispose();
     return { group: s.group, geometry: merged, dispose: () => merged.dispose() };
   }).filter(Boolean), [plan]);
