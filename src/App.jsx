@@ -7,7 +7,9 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import CollectionView from './components/collection/CollectionView';
 import LibraryDialog from './components/LibraryDialog';
 import SingleView from './components/SingleView';
-import { buildPrintFiles, downloadBlob, slugify, zipFiles } from './export';
+import {
+  buildPrintFiles, designCode, downloadBlob, shortHash, printName, slugify, zipFiles,
+} from './export';
 import { loadManifold } from './geometry/manifoldLoader';
 import { caseProject, caseStatus, removeCase } from './model/collection';
 import { planProject } from './model/layout';
@@ -93,19 +95,20 @@ function App() {
   };
 
   const exportSingle = () => runExport('single', (wasm) => {
-    const base = slugify(project.name);
+    const base = printName(project.name, project, plan);
     downloadFiles(buildPrintFiles(wasm, project, plan, base), `${base}.zip`);
   });
 
   const exportCase = (c) => runExport(c.caseItem.id, (wasm) => {
-    const base = slugify(c.caseItem.name);
+    const base = printName(c.caseItem.name, c.project, c.plan);
     downloadFiles(buildPrintFiles(wasm, c.project, c.plan, base), `${base}.zip`);
   });
 
   const printable = cases.filter((c) => c.status.kind !== 'empty');
   const exportAll = () => runExport('all', (wasm) => {
-    const files = printable.flatMap((c) => buildPrintFiles(wasm, c.project, c.plan, slugify(c.caseItem.name)));
-    downloadBlob(zipFiles(files), `${slugify(collection.name)}.zip`);
+    const files = printable.flatMap((c) => buildPrintFiles(wasm, c.project, c.plan, printName(c.caseItem.name, c.project, c.plan)));
+    const code = shortHash(printable.map((c) => designCode(c.project)).join());
+    downloadBlob(zipFiles(files), `${slugify(collection.name)}-${printable.length}-cases-${code}.zip`);
     const problems = printable.filter((c) => c.status.kind === 'error' || c.status.kind === 'warning');
     if (problems.length) notify(`Exported. Check ${problems.map((c) => c.caseItem.name).join(', ')}: not everything fits.`);
   });
