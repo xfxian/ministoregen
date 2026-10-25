@@ -12,7 +12,7 @@ function summary(project) {
   return `${project.groups.length} group${project.groups.length === 1 ? '' : 's'}, ${minis} miniatures`;
 }
 
-function LibraryDialog({ open, onClose, currentId, onOpenDesign, onNewDesign }) {
+function LibraryDialog({ open, onClose, currentId, onOpenDesign, onNewDesign, collection, onImportCollection }) {
   const [designs, setDesigns] = useState(() => listDesigns());
   const [message, setMessage] = useState(null);
   const fileInput = useRef(null);
@@ -20,8 +20,12 @@ function LibraryDialog({ open, onClose, currentId, onOpenDesign, onNewDesign }) 
 
   const handleImport = async (file) => {
     try {
-      const count = importLibrary(await file.text());
-      setMessage({ severity: 'success', text: `Imported ${count} design${count === 1 ? '' : 's'}.` });
+      const { count, collection: imported } = importLibrary(await file.text());
+      const tookCollection = imported ? onImportCollection(imported) : false;
+      setMessage({
+        severity: 'success',
+        text: `Imported ${count} design${count === 1 ? '' : 's'}${tookCollection ? ' and the collection' : ''}.`,
+      });
       refresh();
     } catch (e) {
       setMessage({ severity: 'error', text: e.message });
@@ -33,11 +37,12 @@ function LibraryDialog({ open, onClose, currentId, onOpenDesign, onNewDesign }) 
       <DialogTitle>Library</DialogTitle>
       <DialogContent dividers>
         <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-          Designs are saved in this browser. Export the library to back it up or move it to another device.
+          Saved single bins live in this browser, like your collection. A backup file holds both: use it to keep
+          a copy or to move to another device.
         </Typography>
         {message && <Alert severity={message.severity} sx={{ mb: 1 }} onClose={() => setMessage(null)}>{message.text}</Alert>}
         {designs.length === 0 ? (
-          <Typography variant="body2" sx={{ py: 3, textAlign: 'center' }}>No saved designs yet.</Typography>
+          <Typography variant="body2" sx={{ py: 3, textAlign: 'center' }}>No saved single bins yet.</Typography>
         ) : (
           <List dense>
             {designs.map((d) => (
@@ -68,16 +73,16 @@ function LibraryDialog({ open, onClose, currentId, onOpenDesign, onNewDesign }) 
       </DialogContent>
       <DialogActions sx={{ justifyContent: 'space-between', flexWrap: 'wrap' }}>
         <Stack direction="row" spacing={1}>
-          <Button startIcon={<FileDownload />} disabled={!designs.length}
-            onClick={() => downloadBlob(new Blob([exportLibrary()], { type: 'application/json' }), 'ministoregen-library.json')}>
-            Export
+          <Button startIcon={<FileDownload />}
+            onClick={() => downloadBlob(new Blob([exportLibrary(collection)], { type: 'application/json' }), 'ministoregen-backup.json')}>
+            Back up
           </Button>
-          <Button startIcon={<FileUpload />} onClick={() => fileInput.current?.click()}>Import</Button>
+          <Button startIcon={<FileUpload />} onClick={() => fileInput.current?.click()}>Restore</Button>
           <input ref={fileInput} type="file" accept="application/json,.json" hidden
             onChange={(e) => { const f = e.target.files?.[0]; if (f) handleImport(f); e.target.value = ''; }} />
         </Stack>
         <Stack direction="row" spacing={1}>
-          <Button onClick={onNewDesign}>New design</Button>
+          <Button onClick={onNewDesign}>New single bin</Button>
           <Button onClick={onClose} variant="contained">Close</Button>
         </Stack>
       </DialogActions>

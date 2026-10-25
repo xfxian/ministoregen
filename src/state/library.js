@@ -1,3 +1,4 @@
+import { normalizeCollection } from '../model/collection';
 import { normalizeProject } from '../model/project';
 
 /**
@@ -43,11 +44,15 @@ export function deleteDesign(id) {
   write(read().filter((e) => e.id !== id));
 }
 
-export function exportLibrary() {
-  return JSON.stringify({ format: LIBRARY_FILE_FORMAT, version: 1, designs: read() }, null, 2);
+/** Backup file with all saved single-bin designs and, when given, the collection. */
+export function exportLibrary(collection) {
+  return JSON.stringify({ format: LIBRARY_FILE_FORMAT, version: 1, designs: read(), collection }, null, 2);
 }
 
-/** Merges designs from an exported file; returns how many were added or updated. */
+/**
+ * Merges designs from an exported file. Returns how many designs were added or
+ * updated, and the file's collection (or null) for the caller to adopt.
+ */
 export function importLibrary(text) {
   const data = JSON.parse(text);
   if (data?.format !== LIBRARY_FILE_FORMAT || !Array.isArray(data.designs)) {
@@ -63,5 +68,5 @@ export function importLibrary(text) {
     count++;
   }
   write(entries);
-  return count;
+  return { count, collection: data.collection ? normalizeCollection(data.collection) : null };
 }
