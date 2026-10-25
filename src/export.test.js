@@ -1,6 +1,8 @@
 // @vitest-environment node
 import { describe, expect, it } from 'vitest';
-import { buildPrintFiles, manifoldToStl, zipFiles } from './export';
+import {
+  buildPrintFiles, designCode, manifoldToStl, printName, zipFiles,
+} from './export';
 import Module from 'manifold-3d';
 import { planProject } from './model/layout';
 import { makeDefaultProject } from './model/project';
@@ -51,5 +53,42 @@ describe('export', () => {
     const dirOffset = view.getUint32(end + 16, true);
     expect(view.getUint32(dirOffset, true)).toBe(0x02014b50);
     expect(view.getUint32(0, true)).toBe(0x04034b50);
+  });
+
+  it('names files after the design, its size and its design code', () => {
+    const project = makeDefaultProject();
+    project.name = 'Orks: Boyz';
+    const plan = planProject(project);
+    const name = printName(project.name, project, plan);
+    expect(name).toBe(`orks-boyz-${plan.unitsX}x${plan.unitsY}x${plan.heightUnits}u-${designCode(project)}`);
+    expect(name).toMatch(/-[0-9a-z]{5}$/);
+  });
+
+  it('adds unit names when the design still has a default name', () => {
+    const project = makeDefaultProject();
+    project.groups.push({ ...project.groups[0], name: 'Cavalry' }, { ...project.groups[0], name: 'Heroes' });
+    expect(printName('Case 3', project, planProject(project))).toMatch(/^case-3-infantry-cavalry-\d+x\d+x\d+u-/);
+    expect(printName('My miniatures', project, planProject(project))).toMatch(/^infantry-cavalry-/);
+  });
+
+  it('gives different designs different codes and the same design the same code', () => {
+    const a = makeDefaultProject();
+    const b = makeDefaultProject();
+    expect(designCode(a)).toBe(designCode(b));
+    b.groups[0].count += 1;
+    expect(designCode(a)).not.toBe(designCode(b));
+    b.groups[0].count -= 1;
+    b.groups[0].color = '#000000';
+    b.groups[0].name = 'Renamed';
+    expect(designCode(a)).toBe(designCode(b));
+  });
+
+  it('keeps zip entry names unique', async () => {
+    const files = [
+      { name: 'a.stl', data: new Uint8Array([1]) },
+      { name: 'a.stl', data: new Uint8Array([2]) },
+    ];
+    const bytes = new Uint8Array(await zipFiles(files).arrayBuffer());
+    expect(new TextDecoder().decode(bytes)).toContain('a-2.stl');
   });
 });
