@@ -4,7 +4,7 @@ import {
 } from '@mui/material';
 import { useState } from 'react';
 import {
-  assignRemaining, assignedCount, patchCase, setItemCount, unassigned, updateCaseSettings,
+  assignRemaining, assignedCount, caseGroupId, modelLabel, patchCase, setItemCount, unassigned, updateCaseSettings,
 } from '../../model/collection';
 import { overline, tokens } from '../../theme';
 import AdvancedSettings from '../AdvancedSettings';
@@ -73,27 +73,30 @@ function CaseDetail({ collection, caseItem, project, plan, status, onUpdate, onE
         )}
         {caseItem.items.map((item) => {
           const unit = collection.units.find((u) => u.id === item.unitId);
-          if (!unit) return null;
-          const max = unit.count - assignedCount(collection, unit.id, caseItem.id);
+          const model = unit?.models.find((m) => m.id === item.modelId);
+          if (!model) return null;
+          const name = modelLabel(unit, model);
+          const max = model.count - assignedCount(collection, unit.id, model.id, caseItem.id);
+          const groupId = caseGroupId(unit.id, model.id);
           return (
             <Box
-              key={unit.id}
-              onMouseEnter={() => setHighlightId(unit.id)}
+              key={groupId}
+              onMouseEnter={() => setHighlightId(groupId)}
               onMouseLeave={() => setHighlightId(null)}
               sx={{ display: 'flex', alignItems: 'center', gap: 1, py: 0.5 }}
             >
-              <Box sx={{ width: 10, height: 10, borderRadius: '50%', bgcolor: unit.color, flexShrink: 0 }} />
+              <Box sx={{ width: 10, height: 10, borderRadius: '50%', bgcolor: model.color, flexShrink: 0 }} />
               <Box sx={{ flex: 1, minWidth: 0 }}>
-                <Typography sx={{ fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{unit.name}</Typography>
+                <Typography sx={{ fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{name}</Typography>
                 <Typography sx={{ fontFamily: tokens.mono, fontSize: 12, color: tokens.muted }}>
-                  {item.count} of {unit.count}{max > item.count ? ` · ${max - item.count} more on the shelf` : ''}
+                  {item.count} of {model.count}{max > item.count ? ` · ${max - item.count} more on the shelf` : ''}
                 </Typography>
               </Box>
-              <IconButton size="small" aria-label={`One less ${unit.name}`} onClick={() => onUpdate(setItemCount(caseItem.id, unit.id, item.count - 1))}>
+              <IconButton size="small" aria-label={`One less ${name}`} onClick={() => onUpdate(setItemCount(caseItem.id, unit.id, model.id, item.count - 1))}>
                 <Remove fontSize="small" />
               </IconButton>
               <Typography sx={{ fontFamily: tokens.mono, width: 28, textAlign: 'center' }} aria-live="polite">{item.count}</Typography>
-              <IconButton size="small" aria-label={`One more ${unit.name}`} disabled={item.count >= max} onClick={() => onUpdate(setItemCount(caseItem.id, unit.id, item.count + 1))}>
+              <IconButton size="small" aria-label={`One more ${name}`} disabled={item.count >= max} onClick={() => onUpdate(setItemCount(caseItem.id, unit.id, model.id, item.count + 1))}>
                 <Add fontSize="small" />
               </IconButton>
             </Box>
@@ -112,9 +115,9 @@ function CaseDetail({ collection, caseItem, project, plan, status, onUpdate, onE
       </Section>
 
       <Menu anchorEl={addMenu} open={Boolean(addMenu)} onClose={() => setAddMenu(null)}>
-        {waiting.map(({ unit, count }) => (
-          <MenuItem key={unit.id} onClick={() => { onUpdate(assignRemaining(caseItem.id, unit.id), { commit: true }); setAddMenu(null); }}>
-            <ListItemText primary={unit.name} secondary={`${count} waiting`} />
+        {waiting.map(({ unit, model, count }) => (
+          <MenuItem key={caseGroupId(unit.id, model.id)} onClick={() => { onUpdate(assignRemaining(caseItem.id, unit.id, model.id), { commit: true }); setAddMenu(null); }}>
+            <ListItemText primary={modelLabel(unit, model)} secondary={`${count} waiting`} />
           </MenuItem>
         ))}
       </Menu>

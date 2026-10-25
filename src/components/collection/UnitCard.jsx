@@ -1,5 +1,5 @@
 import { Box, ButtonBase, Typography } from '@mui/material';
-import { unitPlacement } from '../../model/collection';
+import { unitPlacement, unitTotal } from '../../model/collection';
 import { tokens } from '../../theme';
 import BaseSketch, { baseLabel } from './BaseSketch';
 
@@ -8,14 +8,19 @@ const SHAPE_WORDS = { round: 'round', oval: 'oval', square: 'square', rect: 'rec
 function placementText(collection, unit) {
   const placed = unitPlacement(collection, unit.id);
   const stored = placed.reduce((n, p) => n + p.count, 0);
-  const waiting = unit.count - stored;
+  const total = unitTotal(unit);
+  const waiting = total - stored;
   if (!placed.length) return { text: 'Not in a case yet', tone: 'waiting' };
   const where = placed.length === 1 ? placed[0].case.name : `${placed.length} cases`;
-  if (!waiting) return { text: placed.length === 1 && unit.count > 1 ? `All in ${where}` : `In ${where}`, tone: 'ok' };
+  if (!waiting) return { text: placed.length === 1 && total > 1 ? `All in ${where}` : `In ${where}`, tone: 'ok' };
   return { text: `${stored} in ${where} · ${waiting} waiting`, tone: 'waiting' };
 }
 
-/** One unit of the collection as a card; opens the editor when clicked. */
+function modelText(model) {
+  return `${baseLabel(model)} ${SHAPE_WORDS[model.shape]} · ${model.heightMm} mm tall${model.overhang > 0 ? ` · +${model.overhang} mm overhang` : ''}`;
+}
+
+/** One unit of the collection as a card, with a sketch per model; opens the editor when clicked. */
 function UnitCard({ collection, unit, onOpen }) {
   const status = placementText(collection, unit);
   return (
@@ -31,14 +36,21 @@ function UnitCard({ collection, unit, onOpen }) {
         '&.Mui-focusVisible': { outline: `2px solid ${tokens.accent}`, outlineOffset: 2 },
       }}
     >
-      <BaseSketch unit={unit} height={72} />
+      <Box sx={{ display: 'flex', gap: 0.5 }}>
+        {unit.models.map((m) => <Box key={m.id} sx={{ flex: 1, minWidth: 0 }}><BaseSketch model={m} height={72} /></Box>)}
+      </Box>
       <Box sx={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 1 }}>
         <Typography component="h3" sx={{ fontSize: { xs: 16, sm: 18 }, fontWeight: 700, lineHeight: 1.2, minWidth: 0, overflowWrap: 'break-word', hyphens: 'auto' }}>{unit.name || 'Unnamed'}</Typography>
-        <Typography sx={{ fontFamily: tokens.mono, fontSize: 20, fontWeight: 700, flexShrink: 0 }}>×{unit.count}</Typography>
+        <Typography sx={{ fontFamily: tokens.mono, fontSize: 20, fontWeight: 700, flexShrink: 0 }}>×{unitTotal(unit)}</Typography>
       </Box>
-      <Typography sx={{ fontFamily: tokens.mono, fontSize: 12, color: tokens.muted }}>
-        {baseLabel(unit)} {SHAPE_WORDS[unit.shape]} · {unit.heightMm} mm tall{unit.overhang > 0 ? ` · +${unit.overhang} mm overhang` : ''}
-      </Typography>
+      {unit.models.length === 1 ? (
+        <Typography sx={{ fontFamily: tokens.mono, fontSize: 12, color: tokens.muted }}>{modelText(unit.models[0])}</Typography>
+      ) : unit.models.map((m) => (
+        <Typography key={m.id} sx={{ fontFamily: tokens.mono, fontSize: 12, color: tokens.muted, display: 'flex', gap: 0.75 }}>
+          <Box component="span" sx={{ width: 8, height: 8, mt: '5px', borderRadius: '50%', bgcolor: m.color, flexShrink: 0 }} />
+          <span>{m.count}× {m.name || 'Model'}: {modelText(m)}</span>
+        </Typography>
+      ))}
       <Typography sx={{ fontSize: 13, color: status.tone === 'ok' ? tokens.ok : tokens.accentText }}>{status.text}</Typography>
     </ButtonBase>
   );
