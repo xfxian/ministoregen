@@ -37,7 +37,7 @@ function UnitCard({ collection, unit, onOpen }) {
         <Typography sx={{ fontFamily: tokens.mono, fontSize: 20, fontWeight: 700, flexShrink: 0 }}>×{unit.count}</Typography>
       </Box>
       <Typography sx={{ fontFamily: tokens.mono, fontSize: 12, color: tokens.muted }}>
-        {baseLabel(unit)} {SHAPE_WORDS[unit.shape]} · {unit.heightMm} mm tall
+        {baseLabel(unit)} {SHAPE_WORDS[unit.shape]} · {unit.heightMm} mm tall{unit.overhang > 0 ? ` · +${unit.overhang} mm overhang` : ''}
       </Typography>
       <Typography sx={{ fontSize: 13, color: status.tone === 'ok' ? tokens.ok : tokens.accentText }}>{status.text}</Typography>
     </ButtonBase>

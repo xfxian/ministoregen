@@ -180,3 +180,29 @@ describe('project sharing', () => {
     expect(repaired.bin.lip).toBe(true);
   });
 });
+
+describe('overhang', () => {
+  // A Twin Lance style model: 60 mm base, guns reaching 15 mm past it on each side.
+  const plain = makeGroup(0, { name: 'Lance', sizeX: 60, sizeY: 60, count: 2, heightMm: 70 });
+  const wide = { ...plain, overhang: 15 };
+
+  it('keeps models that stick out far enough apart', () => {
+    const plan = planProject(project([wide]));
+    const [a, b] = plan.strips[0].positions;
+    expect(Math.hypot(a[0] - b[0], a[1] - b[1])).toBeGreaterThanOrEqual(60 + 30 + layout.baseClearance);
+    expect(plan.warnings.filter((w) => w.severity === 'error')).toEqual([]);
+  });
+
+  it('picks a bigger bin for the extra room', () => {
+    const small = planProject(project([plain]));
+    const big = planProject(project([wide]));
+    expect(big.unitsX * big.unitsY).toBeGreaterThan(small.unitsX * small.unitsY);
+  });
+
+  it('is stored, shared and repaired with the group', () => {
+    const p = project([wide]);
+    expect(decodeProject(encodeProject(p)).groups[0].overhang).toBe(15);
+    expect(normalizeProject({ groups: [{ ...plain, overhang: undefined }] }).groups[0].overhang).toBe(0);
+    expect(normalizeProject({ groups: [{ ...plain, overhang: -4 }] }).groups[0].overhang).toBe(0);
+  });
+});

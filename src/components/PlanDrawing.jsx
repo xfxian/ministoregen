@@ -9,13 +9,16 @@ function outlinePath(points) {
   return `M${points.map(([px, py]) => `${px.toFixed(2)},${(-py).toFixed(2)}`).join('L')}Z`;
 }
 
+/** The group as wide as the model reaches, for drawing its overhang. */
+const grown = (g) => ({ ...g, sizeX: g.sizeX + 2 * g.overhang, sizeY: g.sizeY + 2 * g.overhang });
+
 function roundedRect(w, h, r, props) {
   return <rect x={-w / 2} y={-h / 2} width={w} height={h} rx={Math.max(0, r)} {...props} />;
 }
 
 /**
  * Top view of a bin as a technical drawing: outline, lip opening, grid cells and every
- * pocket in its group colour (spare pockets dashed). `detailed` adds dimension lines.
+ * pocket in its group colour (spare pockets dashed, overhangs dotted). `detailed` adds dimension lines.
  * `maxPxPerMm` stops small bins from being blown up to fill a large container.
  */
 function PlanDrawing({ project, plan, detailed = false, highlightId = null, label, maxPxPerMm }) {
@@ -54,9 +57,21 @@ function PlanDrawing({ project, plan, detailed = false, highlightId = null, labe
       </g>
       {plan.strips.map(({ group, positions }) => {
         const outline = pocketOutline(group, project.layout, 32);
+        const reach = group.overhang > 0 ? pocketOutline(grown(group), project.layout, 32) : null;
         const dim = highlightId && highlightId !== group.id;
         return (
           <g key={group.id} opacity={dim ? 0.3 : 1}>
+            {reach && positions.slice(0, group.count).map((position) => (
+              <path
+                key={`reach${position[0]},${position[1]}`}
+                d={outlinePath(placeOutline(reach, position))}
+                style={stroke}
+                stroke={group.color}
+                strokeOpacity={0.4}
+                strokeWidth={1}
+                strokeDasharray="1 3"
+              />
+            ))}
             {positions.map((position, i) => {
               const spare = i >= group.count;
               return (

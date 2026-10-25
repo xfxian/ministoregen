@@ -77,6 +77,7 @@ export function makeGroup(index = 0, overrides = {}) {
     sizeY: 32,
     count: 10,
     heightMm: 30,
+    overhang: 0, // how far the model reaches past its base on each side
     color: GROUP_COLORS[index % GROUP_COLORS.length],
     ...overrides,
   };
@@ -115,6 +116,7 @@ export function normalizeGroup(g, index) {
     sizeY: num(g.sizeY, d.sizeY, 5, 200),
     count: Math.round(num(g.count, d.count, 1, 500)),
     heightMm: num(g.heightMm, d.heightMm, 1, 300),
+    overhang: num(g.overhang, d.overhang, 0, 100),
     color: typeof g.color === 'string' && /^#[0-9a-f]{6}$/i.test(g.color) ? g.color : d.color,
   };
 }
