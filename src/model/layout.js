@@ -233,14 +233,16 @@ export function footprintCost(unitsX, unitsY) {
   return unitsX * unitsY + 0.5 * Math.max(0, aspect - 2);
 }
 
-function chooseFootprint(groups, bin, layout) {
-  if (!bin.autoFootprint) return { unitsX: bin.unitsX, unitsY: bin.unitsY, fitsOneBin: true };
+/**
+ * Footprints that hold every group, cheapest first (see footprintCost): squarer before
+ * longer, and longer than wide before wider than long.
+ */
+function* fittingFootprints(groups, bin, layout) {
   // Models never overlap, so the bin needs at least the area they reach over.
   const pocketArea = groups.reduce((n, g) => n + g.count * lattices(g, layout)[0].area, 0);
   const candidates = [];
   for (let ux = 1; ux <= bin.maxUnits; ux++) {
     for (let uy = 1; uy <= bin.maxUnits; uy++) {
-      // Squarer first, then longer than wide.
       candidates.push({ unitsX: ux, unitsY: uy, score: [footprintCost(ux, uy), Math.abs(ux - uy), ux > uy ? 1 : 0] });
     }
   }
@@ -250,10 +252,38 @@ function chooseFootprint(groups, bin, layout) {
     const l = usableSize(c.unitsY, bin, layout);
     if (w * l < pocketArea) continue;
     if (packArea(groups, layout, w, l).fits || (nestable(groups) && nestGroups(groups, layout, w, l))) {
-      return { unitsX: c.unitsX, unitsY: c.unitsY, fitsOneBin: true };
+      yield { unitsX: c.unitsX, unitsY: c.unitsY, cost: c.score[0] };
     }
   }
-  return { unitsX: bin.maxUnits, unitsY: bin.maxUnits, fitsOneBin: false };
+}
+
+function chooseFootprint(groups, bin, layout) {
+  if (!bin.autoFootprint) return { unitsX: bin.unitsX, unitsY: bin.unitsY, fitsOneBin: true };
+  const { value } = fittingFootprints(groups, bin, layout).next();
+  return value
+    ? { unitsX: value.unitsX, unitsY: value.unitsY, fitsOneBin: true }
+    : { unitsX: bin.maxUnits, unitsY: bin.maxUnits, fitsOneBin: false };
+}
+
+/**
+ * Bin sizes worth offering for the project's miniatures: the one the planner picks
+ * on its own, then up to `max` − 1 other sizes that fit everything and cost at most
+ * half as much again. The same size turned by 90° is left out. Each option has its
+ * own plan, laid out for a bin fixed at that size.
+ */
+export function layoutOptions(project, max = 4) {
+  const { groups, bin, layout } = project;
+  if (!groups.length) return [];
+  const options = [];
+  let limit = Infinity;
+  for (const f of fittingFootprints(groups, bin, layout)) {
+    if (f.cost > limit || options.length >= max) break;
+    if (options.some((o) => o.unitsX === f.unitsY && o.unitsY === f.unitsX)) continue;
+    if (!options.length) limit = f.cost * 1.5;
+    const fixed = { ...project, bin: { ...bin, autoFootprint: false, unitsX: f.unitsX, unitsY: f.unitsY } };
+    options.push({ unitsX: f.unitsX, unitsY: f.unitsY, project: fixed, plan: planProject(fixed) });
+  }
+  return options;
 }
 
 function compare(a, b) {

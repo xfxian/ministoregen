@@ -113,3 +113,18 @@ test('saves a single bin to the library', () => {
   fireEvent.click(screen.getByRole('button', { name: 'Library' }));
   expect(within(screen.getByRole('dialog')).getByText('My miniatures')).toBeInTheDocument();
 });
+
+test('another layout that fits can be picked, and the smallest one again', () => {
+  render(<App />);
+  fireEvent.click(screen.getByRole('button', { name: 'Switch to Single bin' }));
+  const auto = screen.getByTestId('bin-summary').textContent;
+  const choices = within(screen.getByRole('radiogroup', { name: 'Layouts that fit' })).getAllByRole('radio');
+  expect(choices.length).toBeGreaterThan(1);
+  expect(choices[0]).toHaveAttribute('aria-checked', 'true');
+  fireEvent.click(choices[1]);
+  const [, size] = /^(\d+ × \d+) bin/.exec(choices[1].getAttribute('aria-label'));
+  expect(screen.getByTestId('bin-summary')).toHaveTextContent(`${size} units`);
+  expect(screen.getByTestId('fit-ok')).toBeInTheDocument();
+  fireEvent.click(within(screen.getByRole('radiogroup', { name: 'Layouts that fit' })).getAllByRole('radio')[0]);
+  expect(screen.getByTestId('bin-summary')).toHaveTextContent(auto);
+});
