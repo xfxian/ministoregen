@@ -1,10 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import {
-  addCase, addUnit, assignRemaining, assignedCount, caseProject, clampAssignments, distribute, makeCase,
+  COLLECTION_VERSION, addCase, addUnit, assignRemaining, assignedCount, caseProject, clampAssignments, distribute, makeCase,
   makeDefaultCollection, makeModel, makeUnit, normalizeCollection, patchUnit, removeUnit, setItemCount, unassigned,
   waitingUnits,
 } from './collection';
 import { planProject } from './layout';
+import { NO_OVERHANG } from './reach';
 
 function collectionWith(units, sortMode = 'units') {
   return units.reduce((c, u) => addUnit(u)(c), { ...makeDefaultCollection(), sortMode });
@@ -112,14 +113,26 @@ describe('assignments', () => {
       cases: [{ id: 'c1', name: 'Case 1', items: [{ unitId: 'u1', count: 2 }] }],
     };
     const c = normalizeCollection(v1);
-    expect(c.version).toBe(3);
+    expect(c.version).toBe(COLLECTION_VERSION);
     expect(c.sortMode).toBe('fill');
     expect(c.units[0]).toMatchObject({ id: 'u1', name: 'Crisis' });
-    expect(c.units[0].models).toEqual([expect.objectContaining({ sizeX: 40, count: 3, heightMm: 50, color: '#ffc861', overhang: 0 })]);
+    expect(c.units[0].models).toEqual([expect.objectContaining({ sizeX: 40, count: 3, heightMm: 50, color: '#ffc861', overhang: NO_OVERHANG })]);
     expect(c.cases[0].items).toEqual([{ unitId: 'u1', modelId: c.units[0].models[0].id, count: 2 }]);
     expect(normalizeCollection({ ...v1, keepTogether: true }).sortMode).toBe('units');
     // Version 2 only changed the default wall; its units still hold one base each.
     expect(normalizeCollection({ ...v1, version: 2 }).cases[0].items[0].modelId).toBe(c.units[0].models[0].id);
+    expect(normalizeCollection(JSON.parse(JSON.stringify(c)))).toEqual(c);
+  });
+
+  it('turns the overhang of collections from version 3 into the same overhang on every side', () => {
+    const v3 = {
+      version: 3,
+      units: [{ id: 'u1', name: 'Lance', models: [{ id: 'm1', name: '', shape: 'round', sizeX: 60, sizeY: 60, count: 2, heightMm: 80, overhang: 12 }] }],
+      cases: [],
+    };
+    const c = normalizeCollection(v3);
+    expect(c.version).toBe(4);
+    expect(c.units[0].models[0].overhang).toEqual({ front: 12, right: 12, back: 12, left: 12 });
     expect(normalizeCollection(JSON.parse(JSON.stringify(c)))).toEqual(c);
   });
 });

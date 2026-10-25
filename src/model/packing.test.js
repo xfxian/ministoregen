@@ -2,7 +2,8 @@
 import Module from 'manifold-3d';
 import { beforeAll, describe, expect, it } from 'vitest';
 import { footprintCost, planProject } from './layout';
-import { placeOutline, pocketOutline } from './pockets';
+import { placeOutline } from './pockets';
+import { reachOutline } from './reach';
 import { makeDefaultProject, makeGroup } from './project';
 
 let wasm;
@@ -17,8 +18,9 @@ function project(groups, layout = {}) {
 }
 
 /**
- * Checks a plan geometrically: every pocket, grown by half the spacing, stays inside
- * the usable area and overlaps no other pocket.
+ * Checks a plan geometrically: everything each model reaches (its pocket, plus any
+ * overhang), grown by half the spacing, stays inside the usable area and overlaps
+ * nothing another model reaches.
  */
 function expectValidPockets(p) {
   const plan = planProject(p);
@@ -28,7 +30,7 @@ function expectValidPockets(p) {
   const halfL = plan.area.length / 2 - margin;
   const sections = [];
   for (const strip of plan.strips) {
-    const outline = pocketOutline(strip.group, p.layout, 32);
+    const outline = reachOutline(strip.group, p.layout, 64);
     for (const position of strip.positions) {
       const points = placeOutline(outline, position);
       for (const [x, y] of points) {
@@ -68,6 +70,45 @@ describe('packing', () => {
     }
   });
 
+  // A Twin Lance style pair: two 60 mm bases posed differently, plus two drones.
+  const lances = [
+    makeGroup(0, { sizeX: 60, sizeY: 60, count: 1, heightMm: 80, overhang: { front: 10, right: 0, back: 0, left: 10 } }),
+    makeGroup(1, { sizeX: 60, sizeY: 60, count: 1, heightMm: 80, overhang: { front: 10, right: 15, back: 20, left: 0 } }),
+    makeGroup(2, { sizeX: 32, sizeY: 32, count: 2, heightMm: 30 }),
+  ];
+
+  it.each([
+    ['overhang on one side', [makeGroup(0, { sizeX: 32, sizeY: 32, count: 7, overhang: { front: 0, right: 15, back: 0, left: 0 } })]],
+    ['overhang to the front of ovals', [makeGroup(0, { shape: 'oval', sizeX: 35.5, sizeY: 60, count: 4, overhang: { front: 12, right: 0, back: 0, left: 0 } })]],
+    ['models posed differently with small ones', lances],
+    ['square bases with a corner overhang', [
+      makeGroup(0, { shape: 'square', sizeX: 40, sizeY: 40, count: 3, overhang: { front: 8, right: 8, back: 0, left: 0 } }),
+      makeGroup(1, { sizeX: 25, sizeY: 25, count: 5 }),
+    ]],
+  ])('keeps every overhang inside the area and clear of the others: %s', (_, groups) => {
+    for (const pocketMode of ['inlay', 'floor']) {
+      const plan = expectValidPockets(project(groups, { pocketMode }));
+      expect(plan.warnings.filter((w) => w.severity === 'error')).toEqual([]);
+    }
+  });
+
+  it('needs much less room for models that stick out on some sides only', () => {
+    const even = planProject(project([
+      makeGroup(0, { sizeX: 60, sizeY: 60, count: 2, heightMm: 80, overhang: 20 }),
+      makeGroup(2, { sizeX: 32, sizeY: 32, count: 2, heightMm: 30 }),
+    ]));
+    const perSide = planProject(project(lances));
+    expect(even.unitsX * even.unitsY).toBe(20);
+    expect(perSide.unitsX * perSide.unitsY).toBeLessThanOrEqual(10);
+  });
+
+  it('fits the pair and drones into a 4 × 3 bin, as laid out by hand', () => {
+    const p = project(lances);
+    p.bin = { ...p.bin, autoFootprint: false, unitsX: 4, unitsY: 3 };
+    const plan = expectValidPockets(p);
+    expect(plan.warnings.filter((w) => w.severity === 'error')).toEqual([]);
+  });
+
   it('turns oval bases when that needs a smaller bin', () => {
     const plan = expectValidPockets(project([makeGroup(0, { shape: 'oval', sizeX: 42, sizeY: 75, count: 5 })]));
     expect(plan.unitsX * plan.unitsY).toBeLessThanOrEqual(12);
@@ -75,14 +116,13 @@ describe('packing', () => {
   });
 
   it('fills the room next to a large base with smaller ones', () => {
-    // A 40 mm base sits next to the 60 mm one, so 3 × 3 is enough; one group per strip needs 3 × 4.
+    // Shelves put a 40 mm base next to the 60 mm one in 3 × 3; placing them freely, the
+    // 40 mm bases nest against it in 2 × 4. One group per strip would need 3 × 4.
     const plan = expectValidPockets(project([
       makeGroup(0, { sizeX: 60, sizeY: 60, count: 1 }),
       makeGroup(1, { sizeX: 40, sizeY: 40, count: 3 }),
     ]));
-    expect(plan.unitsX * plan.unitsY).toBeLessThanOrEqual(9);
-    const [[, bigY]] = plan.strips[0].positions;
-    expect(plan.strips[1].positions.some(([, y]) => Math.abs(y - bigY) < 10)).toBe(true);
+    expect(plan.unitsX * plan.unitsY).toBeLessThanOrEqual(8);
   });
 
   it('prefers a compact bin over a long thin one', () => {

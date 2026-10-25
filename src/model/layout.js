@@ -2,74 +2,58 @@ import {
   FOOT_HEIGHT, HEIGHT_UNIT, LIP_HEIGHT, cavityBottom, maxWall, minBodyHeight, outerSize, throatSize,
 } from '../geometry/gridfinity';
 import { LID_SNAP_DROP, lidHeight } from '../geometry/lid';
+import {
+  evenOverhang, hasOverhang, lattices, normalizeOverhang, reachBox, turnOverhang,
+} from './reach';
+import { nestGroups } from './nest';
 
 /** When bins stack, the upper bin's feet reach this far below the lower bin's lip base. */
 export const STACKED_FOOT_DROP = FOOT_HEIGHT - LIP_HEIGHT;
 
-const SQRT3_2 = Math.sqrt(3) / 2;
-
-/**
- * Room one miniature takes up in the layout: its pocket, plus whatever of the model
- * reaches past the base. The pocket itself stays the size of the base.
- */
-function pocketSize(group, layout) {
-  const extra = layout.baseClearance + 2 * (group.overhang ?? 0);
-  return { dx: group.sizeX + extra, dy: group.sizeY + extra };
-}
-
-/** The same group with its base turned by 90°. */
+/** The same group with its base turned by 90° (counter-clockwise, like placeOutline). */
 function turned(group) {
-  return { ...group, sizeX: group.sizeY, sizeY: group.sizeX };
+  return { ...group, sizeX: group.sizeY, sizeY: group.sizeX, overhang: turnOverhang(normalizeOverhang(group.overhang)) };
 }
 
-/** Orientations worth trying: round and square bases look the same either way. */
+/** Orientations worth trying: a round or square base reaching equally far on every side looks the same either way. */
 function orientations(group) {
-  return group.sizeX === group.sizeY ? [false] : [false, true];
+  return group.sizeX === group.sizeY && evenOverhang(normalizeOverhang(group.overhang)) ? [false] : [false, true];
 }
 
 const oriented = (group, rotated) => (rotated ? turned(group) : group);
 
 /**
  * Pocket centres for one group inside a `width` × `stripLength` rectangle centred on
- * (centerX, centerY). Round and oval bases try both a staggered (hex) and a straight
- * grid and keep whichever holds more.
+ * (centerX, centerY). Tries a straight grid and rows shifted against each other (for
+ * round bases, a hex pattern) and keeps whichever holds more. What a model reaches past
+ * its base stays inside the rectangle too.
  */
 export function layoutStrip(group, layout, stripLength, width, centerY = 0, centerX = 0) {
-  const candidates = packings(group, layout).map((p) => arrange(p, stripLength, width, centerX, centerY));
+  const candidates = lattices(group, layout).map((p) => arrange(p, stripLength, width, centerX, centerY));
   return candidates.reduce((best, c) => (c.length > best.length ? c : best), []);
-}
-
-function packings(group, layout) {
-  const { dx, dy } = pocketSize(group, layout);
-  const g = layout.spacing;
-  const grid = { dx, dy, colStep: dx + g, rowStep: dy + g, stagger: false };
-  if (group.shape === 'square' || group.shape === 'rect') return [grid];
-  return [{ dx, dy, colStep: dx + g, rowStep: (dy + g) * SQRT3_2, stagger: true }, grid];
 }
 
 function countFit(size, pitch, available) {
   return available + 1e-9 < size ? 0 : Math.floor((available - size + 1e-9) / pitch) + 1;
 }
 
-function arrange({ dx, dy, colStep, rowStep, stagger }, stripLength, width, centerX, centerY) {
-  const evenCols = countFit(dx, colStep, width);
-  const oddCols = stagger ? countFit(dx, colStep, width - colStep / 2) : evenCols;
-  const rows = countFit(dy, rowStep, stripLength);
-  // A staggered layout needs at least two columns to save any space.
-  if (evenCols === 0 || rows === 0 || (stagger && evenCols < 2)) return [];
-  // Odd rows sit half a step to the right; when they have the same column count
-  // the pattern gets half a step wider.
-  const patternWidth = (evenCols - 1) * colStep + (stagger && oddCols === evenCols ? colStep / 2 : 0);
-  const patternHeight = (rows - 1) * rowStep;
-  const positions = [];
+function arrange({ colStep, shift, rowStep, box }, stripLength, width, centerX, centerY) {
+  const boxWidth = box.x1 - box.x0;
+  const rows = countFit(box.y1 - box.y0, rowStep, stripLength);
+  const raw = [];
   for (let r = 0; r < rows; r++) {
-    const odd = stagger && r % 2 === 1;
-    const cols = odd ? oddCols : evenCols;
-    const x0 = centerX - patternWidth / 2 + (odd ? colStep / 2 : 0);
-    const y = centerY - patternHeight / 2 + r * rowStep;
-    for (let c = 0; c < cols; c++) positions.push([x0 + c * colStep, y]);
+    // Each row starts as far left as its shift allows.
+    const offset = Math.max(0, r * shift - colStep * Math.floor((r * shift) / colStep + 1e-9));
+    const cols = countFit(boxWidth, colStep, width - offset);
+    for (let c = 0; c < cols; c++) raw.push([offset + c * colStep, r * rowStep]);
   }
-  return positions;
+  if (!raw.length) return [];
+  // Centre what the whole pattern reaches, not just the pocket centres.
+  const xs = raw.map(([x]) => x);
+  const ys = raw.map(([, y]) => y);
+  const dx = centerX - (Math.min(...xs) + box.x0 + Math.max(...xs) + box.x1) / 2;
+  const dy = centerY - (Math.min(...ys) + box.y0 + Math.max(...ys) + box.y1) / 2;
+  return raw.map(([x, y]) => [x + dx, y + dy]);
 }
 
 function fitCount(group, layout, width, length) {
@@ -82,9 +66,9 @@ function fitCount(group, layout, width, length) {
  */
 export function minStripLength(group, layout, width, count = group.count) {
   let best = Infinity;
-  for (const p of packings(group, layout)) {
+  for (const p of lattices(group, layout)) {
     for (let rows = 1; rows <= 500; rows++) {
-      const length = (rows - 1) * p.rowStep + p.dy + layout.spacing;
+      const length = (rows - 1) * p.rowStep + p.box.y1 - p.box.y0 + layout.spacing;
       if (length >= best) break;
       if (arrange(p, length, width, 0, 0).length >= count) {
         best = length;
@@ -108,7 +92,10 @@ function minBlockWidth(group, layout, length, count, maxWidth) {
   return hi;
 }
 
-const largestSide = (g) => Math.max(g.sizeX, g.sizeY) + 2 * (g.overhang ?? 0);
+function largestSide(group, layout) {
+  const { x0, x1, y0, y1 } = reachBox(group, layout);
+  return Math.max(x1 - x0, y1 - y0);
+}
 
 /**
  * Packs every group into a `width` × `length` area in shelves: each shelf runs across
@@ -117,7 +104,7 @@ const largestSide = (g) => Math.max(g.sizeX, g.sizeY) + 2 * (g.overhang ?? 0);
  * A group that runs out of room keeps as many pockets as fit.
  */
 function packArea(groups, layout, width, length) {
-  const order = groups.map((_, i) => i).sort((a, b) => largestSide(groups[b]) - largestSide(groups[a]) || a - b);
+  const order = groups.map((_, i) => i).sort((a, b) => largestSide(groups[b], layout) - largestSide(groups[a], layout) || a - b);
   const shelves = [];
   const placed = groups.map(() => 0);
   let usedLength = 0;
@@ -173,7 +160,7 @@ function packArea(groups, layout, width, length) {
 /**
  * Turns packed shelves into pocket positions. Leftover room is shared out between
  * shelves and blocks, which can add spare pockets. Each group lists the pockets it
- * needs first, then its spares; a position is [x, y, rotated].
+ * needs first, then its spares; a position is [x, y, quarter turns].
  */
 function placePockets(groups, layout, packed, width, length) {
   const real = groups.map(() => []);
@@ -189,7 +176,7 @@ function placePockets(groups, layout, packed, width, length) {
       const w = block.width + (extra * block.width) / blockSum;
       const og = oriented(groups[block.gi], block.rotated);
       const positions = layoutStrip(og, layout, shelfLength, w, y + shelfLength / 2, x + w / 2)
-        .map(([px, py]) => [px, py, block.rotated]);
+        .map(([px, py]) => [px, py, block.rotated ? 1 : 0]);
       real[block.gi].push(...positions.slice(0, block.k));
       spare[block.gi].push(...positions.slice(block.k));
       x += w + layout.spacing;
@@ -197,6 +184,25 @@ function placePockets(groups, layout, packed, width, length) {
     y += shelfLength;
   }
   return groups.map((_, i) => [...real[i], ...spare[i]]);
+}
+
+/** Free placement pays off for mixed models and for models that reach further one way than another. */
+function nestable(groups) {
+  return groups.length > 1 || groups.some((g) => !evenOverhang(normalizeOverhang(g.overhang)));
+}
+
+/**
+ * Pocket positions for every group in a `width` × `length` area: shelves of tidy rows
+ * first, and free placement (nest.js) when the rows do not fit everything. When nothing
+ * fits all of them, the rows keep as many as they can.
+ */
+function packInto(groups, layout, width, length) {
+  const packed = packArea(groups, layout, width, length);
+  if (!packed.fits && nestable(groups)) {
+    const nested = nestGroups(groups, layout, width, length);
+    if (nested) return { fits: true, positions: nested };
+  }
+  return { fits: packed.fits, positions: placePockets(groups, layout, packed, width, length) };
 }
 
 /** The wall the shell actually builds: never thicker than the lip is deep. */
@@ -229,10 +235,8 @@ export function footprintCost(unitsX, unitsY) {
 
 function chooseFootprint(groups, bin, layout) {
   if (!bin.autoFootprint) return { unitsX: bin.unitsX, unitsY: bin.unitsY, fitsOneBin: true };
-  const pocketArea = groups.reduce((n, g) => {
-    const { dx, dy } = pocketSize(g, layout);
-    return n + g.count * dx * dy;
-  }, 0);
+  // Models never overlap, so the bin needs at least the area they reach over.
+  const pocketArea = groups.reduce((n, g) => n + g.count * lattices(g, layout)[0].area, 0);
   const candidates = [];
   for (let ux = 1; ux <= bin.maxUnits; ux++) {
     for (let uy = 1; uy <= bin.maxUnits; uy++) {
@@ -245,7 +249,9 @@ function chooseFootprint(groups, bin, layout) {
     const w = usableSize(c.unitsX, bin, layout);
     const l = usableSize(c.unitsY, bin, layout);
     if (w * l < pocketArea) continue;
-    if (packArea(groups, layout, w, l).fits) return { unitsX: c.unitsX, unitsY: c.unitsY, fitsOneBin: true };
+    if (packArea(groups, layout, w, l).fits || (nestable(groups) && nestGroups(groups, layout, w, l))) {
+      return { unitsX: c.unitsX, unitsY: c.unitsY, fitsOneBin: true };
+    }
   }
   return { unitsX: bin.maxUnits, unitsY: bin.maxUnits, fitsOneBin: false };
 }
@@ -282,8 +288,7 @@ export function planProject(project) {
   const usableW = area.width - 2 * layout.margin;
   const usableL = area.length - 2 * layout.margin;
 
-  const packed = packArea(groups, layout, usableW, usableL);
-  const placements = placePockets(groups, layout, packed, usableW, usableL);
+  const placements = packInto(groups, layout, usableW, usableL).positions;
   const strips = groups.map((group, i) => ({ group, positions: placements[i], capacity: placements[i].length }));
 
   strips.forEach(({ group, capacity }) => {
@@ -293,7 +298,7 @@ export function planProject(project) {
         id: `wide-${group.id}`,
         severity: 'error',
         groupId: group.id,
-        text: `${group.name}: a ${group.sizeX} × ${group.sizeY} mm base${group.overhang ? ` with ${group.overhang} mm overhang` : ''} does not fit in this bin.`,
+        text: `${group.name}: a ${group.sizeX} × ${group.sizeY} mm base${hasOverhang(normalizeOverhang(group.overhang)) ? ' with its overhang' : ''} does not fit in this bin.`,
         fix: bin.autoFootprint ? undefined : { label: 'Size the bin automatically', bin: { autoFootprint: true } },
       });
     } else if (capacity < group.count) {

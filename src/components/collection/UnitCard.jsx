@@ -1,5 +1,6 @@
 import { Box, ButtonBase, Typography } from '@mui/material';
 import { unitPlacement, unitTotal } from '../../model/collection';
+import { SIDES, evenOverhang, hasOverhang, normalizeOverhang } from '../../model/reach';
 import { tokens } from '../../theme';
 import BaseSketch, { baseLabel } from './BaseSketch';
 
@@ -16,8 +17,15 @@ function placementText(collection, unit) {
   return { text: `${stored} in ${where} · ${waiting} waiting`, tone: 'waiting' };
 }
 
+function overhangText(model) {
+  const o = normalizeOverhang(model.overhang);
+  if (!hasOverhang(o)) return '';
+  if (evenOverhang(o)) return ` · +${o.front} mm overhang`;
+  return ` · overhang ${SIDES.filter((s) => o[s] > 0).map((s) => `${s} ${o[s]}`).join(', ')} mm`;
+}
+
 function modelText(model) {
-  return `${baseLabel(model)} ${SHAPE_WORDS[model.shape]} · ${model.heightMm} mm tall${model.overhang > 0 ? ` · +${model.overhang} mm overhang` : ''}`;
+  return `${baseLabel(model)} ${SHAPE_WORDS[model.shape]} · ${model.heightMm} mm tall${overhangText(model)}`;
 }
 
 /** One unit of the collection as a card, with a sketch per model; opens the editor when clicked. */

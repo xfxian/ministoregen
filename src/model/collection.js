@@ -7,13 +7,15 @@
  * as for a single bin.
  */
 import { planProject } from './layout';
+import { reachBox } from './reach';
 import {
   DEFAULT_BIN, DEFAULT_LAYOUT, DEFAULT_PREVIEW, PROJECT_VERSION, isObject, makeGroup, normalizeBin, normalizeGroup,
   normalizeSettings,
 } from './project';
 
-// 2: thicker default wall (see normalizeBin); 3: units hold several models.
-export const COLLECTION_VERSION = 3;
+// 2: thicker default wall (see normalizeBin); 3: units hold several models;
+// 4: overhang per side (see normalizeGroup).
+export const COLLECTION_VERSION = 4;
 
 /**
  * How "Sort into cases" groups miniatures:
@@ -279,7 +281,10 @@ export const assignRemaining = (caseId, unitId, modelId) => (c) => {
 
 const fits = (plan) => !plan.warnings.some((w) => w.severity === 'error');
 const volume = (plan) => plan.unitsX * plan.unitsY * plan.heightUnits;
-const footprintArea = (m) => (m.sizeX + 2 * (m.overhang ?? 0)) * (m.sizeY + 2 * (m.overhang ?? 0));
+function footprintArea(m) {
+  const { x0, x1, y0, y1 } = reachBox(m, DEFAULT_LAYOUT);
+  return (x1 - x0) * (y1 - y0);
+}
 const NEW_CASE_PENALTY = 8; // grid cells × height units
 // In "size" mode, models share a case only when they need about the same bin height.
 const SIZE_TOLERANCE_UNITS = 1;

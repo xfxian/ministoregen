@@ -11,9 +11,19 @@ export function pocketOutline(group, layout, segments = 64) {
   return bezierEllipseOutline(rx, ry, layout.curvature, Math.max(4, Math.round(segments / 4)));
 }
 
-/** Outline points moved to a pocket position [x, y, rotated]; rotated pockets turn by 90°. */
-export function placeOutline(outline, [x, y, rotated]) {
-  return rotated ? outline.map(([px, py]) => [x - py, y + px]) : outline.map(([px, py]) => [x + px, y + py]);
+/**
+ * Outline points moved to a pocket position [x, y, turns], turned by that many quarter
+ * turns counter-clockwise (`true`, from older plans, counts as one).
+ */
+export function placeOutline(outline, [x, y, turns]) {
+  const q = (((Number(turns) || 0) % 4) + 4) % 4;
+  const turn = [
+    ([px, py]) => [x + px, y + py],
+    ([px, py]) => [x - py, y + px],
+    ([px, py]) => [x - px, y - py],
+    ([px, py]) => [x + py, y - px],
+  ][q];
+  return outline.map(turn);
 }
 
 // Four cubic Bézier quarters; a curvature of 0.55 approximates a true ellipse,

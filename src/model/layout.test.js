@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { DEFAULT_WALL, HEIGHT_UNIT, throatSize } from '../geometry/gridfinity';
 import { LID_SNAP_DROP } from '../geometry/lid';
 import { STACKED_FOOT_DROP, layoutStrip, minStripLength, planProject } from './layout';
+import { NO_OVERHANG } from './reach';
 import { DEFAULT_LAYOUT, decodeProject, encodeProject, makeDefaultProject, makeGroup, normalizeProject } from './project';
 
 const layout = DEFAULT_LAYOUT;
@@ -200,9 +201,16 @@ describe('overhang', () => {
   });
 
   it('is stored, shared and repaired with the group', () => {
-    const p = project([wide]);
-    expect(decodeProject(encodeProject(p)).groups[0].overhang).toBe(15);
-    expect(normalizeProject({ groups: [{ ...plain, overhang: undefined }] }).groups[0].overhang).toBe(0);
-    expect(normalizeProject({ groups: [{ ...plain, overhang: -4 }] }).groups[0].overhang).toBe(0);
+    const p = project([{ ...plain, overhang: { front: 0, right: 15, back: 5, left: 0 } }]);
+    expect(decodeProject(encodeProject(p)).groups[0].overhang).toEqual({ front: 0, right: 15, back: 5, left: 0 });
+    expect(normalizeProject({ groups: [{ ...plain, overhang: undefined }] }).groups[0].overhang).toEqual(NO_OVERHANG);
+    expect(normalizeProject({ groups: [{ ...plain, overhang: { right: -4, front: 'x', back: 500 } }] }).groups[0].overhang)
+      .toEqual({ front: 0, right: 0, back: 100, left: 0 });
+  });
+
+  it('reads one overhang from projects saved before version 3 as the same on every side', () => {
+    const old = normalizeProject({ version: 2, groups: [{ ...plain, overhang: 15 }] });
+    expect(old.version).toBe(3);
+    expect(old.groups[0].overhang).toEqual({ front: 15, right: 15, back: 15, left: 15 });
   });
 });
