@@ -6,7 +6,10 @@ const SHAPE_LABELS = { round: 'Round', oval: 'Oval', square: 'Square', rect: 'Re
 
 const presetKey = (x, y) => `${x}x${y}`;
 
-/** Base shape and size of a group or unit: shape buttons, a preset list and custom sizes. */
+/**
+ * Base shape and size of a group or unit: shape buttons, a preset list, custom sizes,
+ * and how far the model sticks out past its base.
+ */
 function BaseFields({ value, onChange }) {
   const presets = BASE_PRESETS[value.shape];
   const key = presetKey(value.sizeX, value.sizeY);
@@ -56,6 +59,15 @@ function BaseFields({ value, onChange }) {
           )}
         </Stack>
       )}
+      <Stepper
+        label="Overhang"
+        value={value.overhang ?? 0}
+        unit="mm"
+        min={0}
+        step={1}
+        helperText="How far the model reaches past its base on each side"
+        onChange={(v) => onChange({ overhang: Math.min(100, Math.max(0, v)) })}
+      />
     </Stack>
   );
 }

@@ -8,8 +8,13 @@ export const STACKED_FOOT_DROP = FOOT_HEIGHT - LIP_HEIGHT;
 
 const SQRT3_2 = Math.sqrt(3) / 2;
 
+/**
+ * Room one miniature takes up in the layout: its pocket, plus whatever of the model
+ * reaches past the base. The pocket itself stays the size of the base.
+ */
 function pocketSize(group, layout) {
-  return { dx: group.sizeX + layout.baseClearance, dy: group.sizeY + layout.baseClearance };
+  const extra = layout.baseClearance + 2 * (group.overhang ?? 0);
+  return { dx: group.sizeX + extra, dy: group.sizeY + extra };
 }
 
 /** The same group with its base turned by 90°. */
@@ -103,7 +108,7 @@ function minBlockWidth(group, layout, length, count, maxWidth) {
   return hi;
 }
 
-const largestSide = (g) => Math.max(g.sizeX, g.sizeY);
+const largestSide = (g) => Math.max(g.sizeX, g.sizeY) + 2 * (g.overhang ?? 0);
 
 /**
  * Packs every group into a `width` × `length` area in shelves: each shelf runs across
@@ -219,7 +224,10 @@ export function footprintCost(unitsX, unitsY) {
 
 function chooseFootprint(groups, bin, layout) {
   if (!bin.autoFootprint) return { unitsX: bin.unitsX, unitsY: bin.unitsY, fitsOneBin: true };
-  const pocketArea = groups.reduce((n, g) => n + g.count * (g.sizeX + layout.baseClearance) * (g.sizeY + layout.baseClearance), 0);
+  const pocketArea = groups.reduce((n, g) => {
+    const { dx, dy } = pocketSize(g, layout);
+    return n + g.count * dx * dy;
+  }, 0);
   const candidates = [];
   for (let ux = 1; ux <= bin.maxUnits; ux++) {
     for (let uy = 1; uy <= bin.maxUnits; uy++) {
@@ -280,7 +288,7 @@ export function planProject(project) {
         id: `wide-${group.id}`,
         severity: 'error',
         groupId: group.id,
-        text: `${group.name}: a ${group.sizeX} × ${group.sizeY} mm base does not fit in this bin.`,
+        text: `${group.name}: a ${group.sizeX} × ${group.sizeY} mm base${group.overhang ? ` with ${group.overhang} mm overhang` : ''} does not fit in this bin.`,
         fix: bin.autoFootprint ? undefined : { label: 'Size the bin automatically', bin: { autoFootprint: true } },
       });
     } else if (capacity < group.count) {
