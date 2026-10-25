@@ -5,7 +5,7 @@ import { LID_SNAP_DROP } from '../geometry/lid';
 import { buildBinPart, buildInlayPart, buildLidPart } from '../geometry/parts';
 import { STACKED_FOOT_DROP } from '../model/layout';
 import { toBufferGeometry } from '../geometry/toBufferGeometry';
-import { placeOutline, pocketOutline } from '../model/pockets';
+import { cutOutlines, placeOutline } from '../model/pockets';
 import { hasOverhang, normalizeOverhang, reachOutline } from '../model/reach';
 
 // Keeps the left half of the model when the cut view is on, exposing the wall profile.
@@ -47,20 +47,27 @@ function Part({ geometry, color, opacity, wireframe, cut, z = 0 }) {
   );
 }
 
+/** An outline shrunk towards its own centre, so a marker stays clear of the pocket wall. */
+function shrink(outline, k) {
+  const cx = outline.reduce((n, [x]) => n + x, 0) / outline.length;
+  const cy = outline.reduce((n, [, y]) => n + y, 0) / outline.length;
+  return outline.map(([x, y]) => [cx + (x - cx) * k, cy + (y - cy) * k]);
+}
+
 /** Coloured discs on the pocket floors, one colour per group. */
 function PocketMarkers({ project, plan, highlightId, cut }) {
   const geometries = useMemo(() => plan.strips.map((s) => {
     if (!s.positions.length) return null;
-    const outline = pocketOutline(s.group, project.layout, 48).map(([x, y]) => [x * 0.92, y * 0.92]);
-    const parts = s.positions.map((p) => new THREE.ShapeGeometry(new THREE.Shape(placeOutline(outline, p).map(([x, y]) => new THREE.Vector2(x, y)))));
+    const outlines = cutOutlines({ ...s.group, notches: false }, project.layout, 48).map((o) => shrink(o, 0.92));
+    const parts = s.positions.flatMap((p) => outlines.map((o) => new THREE.ShapeGeometry(new THREE.Shape(placeOutline(o, p).map(([x, y]) => new THREE.Vector2(x, y))))));
     const merged = mergeGeometries(parts);
     parts.forEach((g) => g.dispose());
-    return { group: s.group, geometry: merged, dispose: () => merged.dispose() };
+    return { group: s.group, seatZ: s.seatZ, geometry: merged, dispose: () => merged.dispose() };
   }).filter(Boolean), [plan, project.layout]);
   useEffect(() => () => geometries.forEach((g) => g.dispose()), [geometries]);
 
-  return geometries.map(({ group, geometry }) => (
-    <mesh key={group.id} geometry={geometry} position={[0, 0, plan.floorZ + 0.05]}>
+  return geometries.map(({ group, seatZ, geometry }) => (
+    <mesh key={group.id} geometry={geometry} position={[0, 0, seatZ + 0.05]}>
       <meshBasicMaterial color={group.color} transparent opacity={highlightId && highlightId !== group.id ? 0.25 : 0.9} clippingPlanes={cut ? [CUT_PLANE] : []} />
     </mesh>
   ));
@@ -68,14 +75,17 @@ function PocketMarkers({ project, plan, highlightId, cut }) {
 
 /**
  * A stand-in for one model, centred on its base: the base shape up to its full height,
- * and for a model that reaches past its base, that reach over its upper half.
+ * and for a model that reaches past its base, that reach over its upper half. A model
+ * without a base gets its hull above the floor, `lift` higher than where its touchpoints stand.
  */
-function ghostGeometry(group, layout) {
+function ghostGeometry(group, layout, lift) {
   const { sizeX, sizeY, heightMm, shape } = group;
-  const base = (shape === 'square' || shape === 'rect'
-    ? new THREE.BoxGeometry(sizeX * 0.9, sizeY * 0.9, heightMm)
-    : new THREE.CylinderGeometry(0.45, 0.45, heightMm, 24).rotateX(Math.PI / 2).scale(sizeX, sizeY, 1)
-  ).translate(0, 0, heightMm / 2);
+  const z0 = shape === 'pads' ? Math.min(lift, heightMm / 2) : 0;
+  const tall = heightMm - z0;
+  const base = (shape === 'square' || shape === 'rect' || shape === 'pads'
+    ? new THREE.BoxGeometry(sizeX * 0.9, sizeY * 0.9, tall)
+    : new THREE.CylinderGeometry(0.45, 0.45, tall, 24).rotateX(Math.PI / 2).scale(sizeX, sizeY, 1)
+  ).translate(0, 0, z0 + tall / 2);
   if (!hasOverhang(normalizeOverhang(group.overhang))) return base;
   const outline = reachOutline(group, layout, 32).map(([x, y]) => new THREE.Vector2(x, y));
   const reach = new THREE.ExtrudeGeometry(new THREE.Shape(outline), { depth: heightMm / 2, bevelEnabled: false })
@@ -92,17 +102,17 @@ function MiniGhosts({ project, plan, highlightId, cut }) {
   const geometries = useMemo(() => plan.strips.map((s) => {
     const placed = s.positions.slice(0, s.group.count);
     if (!placed.length) return null;
-    const ghost = ghostGeometry(s.group, project.layout);
+    const ghost = ghostGeometry(s.group, project.layout, s.depth);
     const merged = mergeGeometries(placed.map(([x, y, turns]) => ghost.clone()
       .rotateZ(((Number(turns) || 0) * Math.PI) / 2)
       .translate(x, y, 0)));
     ghost.dispose();
-    return { group: s.group, geometry: merged, dispose: () => merged.dispose() };
+    return { group: s.group, seatZ: s.seatZ, geometry: merged, dispose: () => merged.dispose() };
   }).filter(Boolean), [plan, project.layout]);
   useEffect(() => () => geometries.forEach((g) => g.dispose()), [geometries]);
 
-  return geometries.map(({ group, geometry }) => (
-    <mesh key={group.id} geometry={geometry} position={[0, 0, plan.floorZ]}>
+  return geometries.map(({ group, seatZ, geometry }) => (
+    <mesh key={group.id} geometry={geometry} position={[0, 0, seatZ]}>
       <meshStandardMaterial color={group.color} transparent opacity={highlightId && highlightId !== group.id ? 0.08 : 0.3} depthWrite={false} clippingPlanes={cut ? [CUT_PLANE] : []} />
     </mesh>
   ));
@@ -115,7 +125,7 @@ function Scene({ wasm, project, plan, view, highlightId }) {
   const binKey = JSON.stringify([plan.unitsX, plan.unitsY, plan.heightMm, project.bin, preview.segments,
     project.layout.pocketMode === 'floor' ? [project.layout, plan.strips.map((s) => [s.group, s.positions])] : '']);
   const inlayKey = JSON.stringify([plan.inlay, project.layout, preview.segments,
-    plan.strips.map((s) => [s.group.shape, s.group.sizeX, s.group.sizeY, s.positions])]);
+    plan.strips.map((s) => [s.group.shape, s.group.sizeX, s.group.sizeY, s.group.notches, s.group.pads, s.depth, s.positions])]);
 
   const binGeometry = useManifoldGeometry(wasm, () => buildBinPart(wasm, project, plan), binKey);
   const inlayGeometry = useManifoldGeometry(wasm, () => (plan.inlay ? buildInlayPart(wasm, project, plan) : null), inlayKey);

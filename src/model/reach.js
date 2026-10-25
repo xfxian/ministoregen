@@ -8,7 +8,7 @@
  * one side stretches it into a stadium shape. The reach is always convex, which makes
  * the spacing between two models exact to compute from support functions.
  */
-import { pocketOutline } from './pockets';
+import { NOTCH_RADIUS, notchCentres, notchOutlines, pocketOutline } from './pockets';
 
 export const SIDES = ['front', 'right', 'back', 'left'];
 export const NO_OVERHANG = { front: 0, right: 0, back: 0, left: 0 };
@@ -32,12 +32,24 @@ export function turnOverhang(o) {
   return { front: o.right, left: o.front, back: o.left, right: o.back };
 }
 
-/** Bounding box of the model's reach around its centre: { x0, x1, y0, y1 }. */
+/**
+ * Bounding box of the model's reach around its centre: { x0, x1, y0, y1 }. Finger
+ * notches are cut into the floor, so they need room too where the model does not
+ * already reach over them.
+ */
 export function reachBox(group, layout) {
   const o = normalizeOverhang(group.overhang);
   const rx = (group.sizeX + layout.baseClearance) / 2;
   const ry = (group.sizeY + layout.baseClearance) / 2;
-  return { x0: -(rx + o.left), x1: rx + o.right, y0: -(ry + o.back), y1: ry + o.front };
+  const box = { x0: -(rx + o.left), x1: rx + o.right, y0: -(ry + o.back), y1: ry + o.front };
+  if (!group.notches) return box;
+  for (const [x, y] of notchCentres(group, layout)) {
+    box.x0 = Math.min(box.x0, x - NOTCH_RADIUS);
+    box.x1 = Math.max(box.x1, x + NOTCH_RADIUS);
+    box.y0 = Math.min(box.y0, y - NOTCH_RADIUS);
+    box.y1 = Math.max(box.y1, y + NOTCH_RADIUS);
+  }
+  return box;
 }
 
 /** Points of the overhang shape, centred on the base: four quarter ellipses. */
@@ -76,14 +88,17 @@ export function reachOutline(group, layout, segments = 64) {
   const extra = overhangPoints(o, Math.max(2, Math.round(segments / 8)));
   const sums = [];
   for (const [bx, by] of base) for (const [ex, ey] of extra) sums.push([bx + ex, by + ey]);
-  return convexHull(sums);
+  return convexHull([...sums, ...notchOutlines(group, layout, segments).flat()]);
 }
+
+/** Whether the model has finger notches, and which way they point when it is as wide as long. */
+export const notchKey = (g) => (g.notches ? 1 + Boolean(g.notchTurned) : 0);
 
 /** The model turned by `turns` quarter turns counter-clockwise, the way placeOutline turns pockets. */
 export function turnGroup(group, turns) {
   let g = { ...group, overhang: normalizeOverhang(group.overhang) };
   for (let i = 0; i < ((turns % 4) + 4) % 4; i++) {
-    g = { ...g, sizeX: g.sizeY, sizeY: g.sizeX, overhang: turnOverhang(g.overhang) };
+    g = { ...g, sizeX: g.sizeY, sizeY: g.sizeX, overhang: turnOverhang(g.overhang), notchTurned: !g.notchTurned };
   }
   return g;
 }
@@ -93,7 +108,7 @@ export function distinctTurns(group) {
   const seen = new Set();
   return [0, 1, 2, 3].filter((t) => {
     const g = turnGroup(group, t);
-    const key = [g.sizeX, g.sizeY, ...SIDES.map((s) => g.overhang[s])].join('|');
+    const key = [g.sizeX, g.sizeY, notchKey(g), ...SIDES.map((s) => g.overhang[s])].join('|');
     if (seen.has(key)) return false;
     seen.add(key);
     return true;
@@ -116,7 +131,7 @@ const ELLIPSE_CURVATURE = (4 / 3) * (Math.SQRT2 - 1);
 
 const shapeKey = (group, layout) => {
   const o = normalizeOverhang(group.overhang);
-  return [group.shape, group.sizeX, group.sizeY, o.front, o.right, o.back, o.left,
+  return [group.shape, group.sizeX, group.sizeY, o.front, o.right, o.back, o.left, notchKey(group),
     layout.baseClearance, layout.spacing, layout.curvature].join('|');
 };
 
@@ -140,14 +155,16 @@ export function shapeSupports(group, layout) {
     dense ??= pocketOutline(group, layout, DENSE_SEGMENTS);
     return dense;
   };
+  const notches = group.notches ? notchCentres(group, layout) : [];
   const pocket = new Float64Array(STEPS);
   const reach = new Float64Array(STEPS);
   DIRS.forEach(([ux, uy], k) => {
     // Round pockets are kept apart like true ellipses, which also covers their Bézier outline.
     let h = round ? Math.hypot(rx * ux, ry * uy) : -Infinity;
     if (!withinEllipse) for (const [px, py] of outline()) h = Math.max(h, ux * px + uy * py);
-    pocket[k] = h;
-    reach[k] = h + Math.hypot((ux >= 0 ? o.right : o.left) * ux, (uy >= 0 ? o.front : o.back) * uy);
+    const notch = notches.reduce((m, [cx, cy]) => Math.max(m, ux * cx + uy * cy + NOTCH_RADIUS), -Infinity);
+    pocket[k] = Math.max(h, notch);
+    reach[k] = Math.max(notch, h + Math.hypot((ux >= 0 ? o.right : o.left) * ux, (uy >= 0 ? o.front : o.back) * uy));
   });
   const result = { pocket, reach };
   if (supportCache.size > 2000) supportCache.clear();

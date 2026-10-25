@@ -1,28 +1,46 @@
-import { placeOutline, pocketOutline } from '../model/pockets';
+import { cutOutlines, placeOutline } from '../model/pockets';
 import { buildGridfinityBin } from './gridfinity';
 import { buildLid, buildSnapGrooves } from './lid';
 
-/** Union of all pocket outlines of a plan as one CrossSection, in bin coordinates. */
-function pocketSection(wasm, project, plan, segments) {
+/**
+ * Everything cut for a plan's models (pockets, touchpoints, finger notches) as one
+ * CrossSection per pocket depth, in bin coordinates: [{ depth, section }].
+ */
+function pocketSections(wasm, project, plan, segments) {
   const { CrossSection } = wasm;
-  const sections = [];
+  const byDepth = new Map();
   for (const strip of plan.strips) {
     if (!strip.positions.length) continue;
-    const outline = pocketOutline(strip.group, project.layout, segments);
-    for (const position of strip.positions) sections.push(CrossSection.ofPolygons([placeOutline(outline, position)]));
+    const outlines = cutOutlines(strip.group, project.layout, segments);
+    const list = byDepth.get(strip.depth) ?? [];
+    for (const position of strip.positions) {
+      for (const outline of outlines) list.push(CrossSection.ofPolygons([placeOutline(outline, position)]));
+    }
+    byDepth.set(strip.depth, list);
   }
-  if (!sections.length) return null;
-  const union = CrossSection.union(sections);
-  sections.forEach((s) => s.delete());
-  return union;
+  return [...byDepth].map(([depth, sections]) => {
+    const section = CrossSection.union(sections);
+    sections.forEach((s) => s.delete());
+    return { depth, section };
+  });
 }
 
-function cutPockets(wasm, solid, pockets, zBottom, depth) {
-  if (!pockets) return solid;
-  const prism = wasm.Manifold.extrude(pockets, depth + 0.02);
-  const placed = prism.translate(0, 0, zBottom);
-  const result = solid.subtract(placed);
-  [prism, placed, solid].forEach((m) => m.delete());
+/**
+ * Cuts the pockets down from `top`. A pocket as deep as everything above `bottom`
+ * goes right through (for the inlay); `bottom` is null where nothing may go through.
+ */
+function cutPockets(wasm, solid, pockets, top, bottom = null) {
+  let result = solid;
+  for (const { depth, section } of pockets) {
+    const through = bottom !== null && top - depth <= bottom + 1e-9;
+    const z0 = through ? bottom - 0.01 : top - depth;
+    const prism = wasm.Manifold.extrude(section, top - z0 + 0.02);
+    const placed = prism.translate(0, 0, z0);
+    const next = result.subtract(placed);
+    [prism, placed, result].forEach((m) => m.delete());
+    section.delete();
+    result = next;
+  }
   return result;
 }
 
@@ -35,7 +53,7 @@ function cutSnapGrooves(wasm, solid, plan) {
 }
 
 /**
- * The printable bin. In floor mode the floor is made thicker by the pocket depth
+ * The printable bin. In floor mode the floor is made thicker by the deepest pocket
  * and the pockets are cut into it, so bases sit at the same height in both modes.
  * A lid with snap clips needs grooves in the wall for the clips to catch in.
  */
@@ -47,19 +65,16 @@ export function buildBinPart(wasm, project, plan) {
     unitsY: plan.unitsY,
     heightMm: plan.heightMm,
     wall: bin.wall,
-    floor: bin.floor + (floorMode ? layout.pocketDepth : 0),
+    floor: bin.floor + (floorMode ? plan.pocketDepth : 0),
     lip: bin.lip,
     feet: bin.feet,
     segments: preview.segments,
   }), plan);
   if (!floorMode) return shell;
-  const pockets = pocketSection(wasm, project, plan, preview.segments * 2);
-  const result = cutPockets(wasm, shell, pockets, plan.floorZ, layout.pocketDepth);
-  pockets?.delete();
-  return result;
+  return cutPockets(wasm, shell, pocketSections(wasm, project, plan, preview.segments * 2), plan.floorZ + plan.pocketDepth);
 }
 
-/** The drop-in inlay: a rounded plate with through pockets, bottom at Z = 0. */
+/** The drop-in inlay: a rounded plate with pockets, through where they are as deep as the plate, bottom at Z = 0. */
 export function buildInlayPart(wasm, project, plan) {
   const { CrossSection, Manifold } = wasm;
   const { width, length, depth, cornerRadius } = plan.inlay;
@@ -68,10 +83,7 @@ export function buildInlayPart(wasm, project, plan) {
   const outline = core.offset(r, 'Round', 2, project.preview.segments);
   const plate = Manifold.extrude(outline, depth);
   [core, outline].forEach((o) => o.delete());
-  const pockets = pocketSection(wasm, project, plan, project.preview.segments * 2);
-  const result = cutPockets(wasm, plate, pockets, -0.01, depth);
-  pockets?.delete();
-  return result;
+  return cutPockets(wasm, plate, pocketSections(wasm, project, plan, project.preview.segments * 2), depth, 0);
 }
 
 /** The lid, upright as it is printed, or null when the design has none. */

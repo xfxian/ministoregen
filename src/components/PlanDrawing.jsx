@@ -1,5 +1,5 @@
 import { GRID_PITCH, LIP_DEPTH, OUTER_RADIUS, outerSize } from '../geometry/gridfinity';
-import { placeOutline, pocketOutline } from '../model/pockets';
+import { cutOutlines, notchOutlines, placeOutline, pocketOutline } from '../model/pockets';
 import { hasOverhang, normalizeOverhang, reachOutline } from '../model/reach';
 import { tokens } from '../theme';
 
@@ -16,7 +16,8 @@ function roundedRect(w, h, r, props) {
 
 /**
  * Top view of a bin as a technical drawing: outline, lip opening, grid cells and every
- * pocket in its group colour (spare pockets dashed, overhangs dotted). `detailed` adds dimension lines.
+ * pocket in its group colour (spare pockets dashed, overhangs dotted). A model without a base
+ * shows its footprint as a thin outline around its touchpoints. `detailed` adds dimension lines.
  * `maxPxPerMm` stops small bins from being blown up to fill a large container.
  */
 function PlanDrawing({ project, plan, detailed = false, highlightId = null, label, maxPxPerMm }) {
@@ -55,8 +56,12 @@ function PlanDrawing({ project, plan, detailed = false, highlightId = null, labe
       </g>
       {plan.strips.map(({ group, positions }) => {
         const outline = pocketOutline(group, project.layout, 32);
-        const reach = hasOverhang(normalizeOverhang(group.overhang)) ? reachOutline(group, project.layout, 32) : null;
+        const plain = { ...group, notches: false };
+        const reach = hasOverhang(normalizeOverhang(group.overhang)) ? reachOutline(plain, project.layout, 32) : null;
+        const pads = group.shape === 'pads' ? cutOutlines(plain, project.layout, 32) : null;
+        const notches = notchOutlines(group, project.layout, 32);
         const dim = highlightId && highlightId !== group.id;
+        const width = detailed ? 1.5 : 1.2;
         return (
           <g key={group.id} opacity={dim ? 0.3 : 1}>
             {reach && positions.slice(0, group.count).map((position) => (
@@ -73,18 +78,32 @@ function PlanDrawing({ project, plan, detailed = false, highlightId = null, labe
             ))}
             {positions.map((position, i) => {
               const spare = i >= group.count;
+              const look = {
+                style: stroke,
+                fill: spare ? 'none' : group.color,
+                fillOpacity: spare ? 0 : 0.14,
+                stroke: group.color,
+                strokeOpacity: spare ? 0.45 : 1,
+                strokeWidth: width,
+                strokeDasharray: spare ? '3 3' : undefined,
+              };
+              const key = `${position[0]},${position[1]}`;
               return (
-                <path
-                  key={`${position[0]},${position[1]}`}
-                  d={outlinePath(placeOutline(outline, position))}
-                  style={stroke}
-                  fill={spare ? 'none' : group.color}
-                  fillOpacity={spare ? 0 : 0.14}
-                  stroke={group.color}
-                  strokeOpacity={spare ? 0.45 : 1}
-                  strokeWidth={detailed ? 1.5 : 1.2}
-                  strokeDasharray={spare ? '3 3' : undefined}
-                />
+                <g key={key}>
+                  {notches.map((n, j) => <path key={`n${j}`} d={outlinePath(placeOutline(n, position))} {...look} />)}
+                  {/* Covers where a notch overlaps its pocket, so the two read as one cut. */}
+                  {notches.length > 0 && !pads && (
+                    <path d={outlinePath(placeOutline(outline, position))} style={{ ...stroke, fill: tokens.bg }} stroke="none" />
+                  )}
+                  {pads ? (
+                    <>
+                      <path d={outlinePath(placeOutline(outline, position))} style={stroke} stroke={group.color} strokeOpacity={spare ? 0.3 : 0.6} strokeWidth={1} strokeDasharray={spare ? '3 3' : undefined} />
+                      {pads.map((pad, j) => <path key={`p${j}`} d={outlinePath(placeOutline(pad, position))} {...look} />)}
+                    </>
+                  ) : (
+                    <path d={outlinePath(placeOutline(outline, position))} {...look} />
+                  )}
+                </g>
               );
             })}
           </g>
