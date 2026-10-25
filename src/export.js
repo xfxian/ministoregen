@@ -7,6 +7,43 @@ export function slugify(name) {
   return name.toLowerCase().normalize('NFKD').replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'design';
 }
 
+// Default names: numbered ones still tell cases apart, the others say nothing about the item.
+const NUMBERED_NAME = /^(case|group|unit) \d+$/i;
+const PLACEHOLDER_NAME = /^my (miniatures|collection)$/i;
+
+/** Five base-36 characters from a string (FNV-1a), for short names that change with their input. */
+export function shortHash(text) {
+  let hash = 0x811c9dc5;
+  for (let i = 0; i < text.length; i++) hash = Math.imul(hash ^ text.charCodeAt(i), 0x01000193);
+  return (hash >>> 0).toString(36).padStart(7, '0').slice(-5);
+}
+
+/** Short, stable code for a design's geometry: same design, same code; any change, a new one. */
+export function designCode(project) {
+  return shortHash(JSON.stringify({
+    groups: project.groups.map(({ shape, sizeX, sizeY, count, heightMm }) => [shape, sizeX, sizeY, count, heightMm]),
+    bin: project.bin,
+    layout: project.layout,
+  }));
+}
+
+/**
+ * File name base for a design, such as `case-2-orks-boyz-3x2x6u-k3f9a`: its name (plus its first
+ * unit names when the name is a default like "Case 2" or "My miniatures"), its size in grid units,
+ * and its design code, so downloads say what they hold and two different designs never share a name.
+ */
+export function printName(name, project, plan) {
+  const trimmed = (name ?? '').trim();
+  const placeholder = !trimmed || PLACEHOLDER_NAME.test(trimmed);
+  const parts = placeholder ? [] : [slugify(trimmed)];
+  if (placeholder || NUMBERED_NAME.test(trimmed)) {
+    const units = project.groups.map((g) => slugify(g.name)).filter((s) => s !== 'design');
+    parts.push(units.slice(0, 2).join('-'));
+  }
+  const label = parts.filter((s) => s && s !== 'design').join('-').slice(0, 48).replace(/-+$/, '') || 'bin';
+  return `${label}-${plan.unitsX}x${plan.unitsY}x${plan.heightUnits}u-${designCode(project)}`;
+}
+
 export function downloadBlob(blob, filename) {
   const url = URL.createObjectURL(blob);
   const link = document.createElement('a');
@@ -43,7 +80,7 @@ export function manifoldToStl(manifold) {
 }
 
 /** STL files for one design: the bin, plus the inlay and the lid when the design has them. */
-export function buildPrintFiles(wasm, project, plan, baseName = slugify(project.name)) {
+export function buildPrintFiles(wasm, project, plan, baseName = printName(project.name, project, plan)) {
   const exportProject = { ...project, preview: { ...project.preview, segments: Math.max(EXPORT_SEGMENTS, project.preview.segments) } };
   const files = [];
   const add = (name, manifold) => {
@@ -77,8 +114,13 @@ export function zipFiles(files) {
   const encoder = new TextEncoder();
   const chunks = [];
   const central = [];
+  const used = new Set();
   let offset = 0;
-  for (const { name, data } of files) {
+  for (const file of files) {
+    const { data } = file;
+    let name = file.name;
+    for (let n = 2; used.has(name); n++) name = file.name.replace(/(\.[^.]*)?$/, `-${n}$1`);
+    used.add(name);
     const nameBytes = encoder.encode(name);
     const crc = crc32(data);
     const local = new DataView(new ArrayBuffer(30));
