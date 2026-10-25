@@ -6,15 +6,16 @@ Live at: https://xfxian.github.io/ministoregen
 
 ## Features
 
-- **Start from your collection**: list groups of miniatures (base shape and size, count, height); the bin size, height and pocket layout follow
+- **My collection**: list the units you own (base shape and size, count, height), then sort them into cases automatically or by dragging; every case sizes its own bin
+- **Single bin**: skip the collection and design one bin from a list of miniature groups; the bin size, height and pocket layout follow
 - **Gridfinity bins** that stack: spec foot profile, stacking lip and 7 mm height units, built as one watertight solid
 - **Two pocket modes**: a drop-in inlay that passes through the stacking lip, or pockets cut straight into the bin floor
 - **Round, oval, square and rectangular bases** with game presets; staggered or straight packing, whichever fits more
 - **Fit check** with warnings and one-click fixes (too tall, does not fit, base wider than the bin)
-- **3D, top and cut-away views**, with optional stand-ins for the miniatures
-- **Library** of saved designs in the browser, with export and import as a file
+- **Plan, 3D and cut-away views**, with optional stand-ins for the miniatures
+- **Library** of saved designs in the browser; one backup file holds the designs and the collection
 - **Share link** that carries the whole design; undo and redo
-- **STL export** for the bin and the inlay
+- **STL export** for the bin and the inlay, or every case at once as a zip
 
 ## Tech stack
 
@@ -38,11 +39,14 @@ npm run lint      # lint with ESLint
 
 ```
 src/
-  App.jsx               # layout, header actions (save, share, download)
-  model/                # project state, layout planner, pocket outlines (pure, tested)
+  App.jsx               # header, mode switch, export and share
+  theme.js              # colours, fonts and the dark MUI theme
+  export.js             # binary STL and zip writer
+  model/                # project and collection state, case sorting, layout planner, pocket outlines (pure, tested)
   geometry/             # Gridfinity shell and printable parts on manifold-3d (tested)
-  state/                # project state hook (undo, URL, local storage) and the design library
-  components/           # panel steps, 3D viewport and scene, library dialog
+  state/                # undo history, project and collection hooks (URL, local storage), design library
+  components/           # single-bin steps, plan drawing, 3D viewport, library dialog
+  components/collection # units, shelf, case board and case detail
 ```
 
 Contributor and agent workflow notes live in `AGENTS.md`.

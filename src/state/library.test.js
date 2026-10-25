@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest';
+import { addUnit, makeDefaultCollection, makeUnit } from '../model/collection';
 import { makeDefaultProject } from '../model/project';
 import { deleteDesign, exportLibrary, importLibrary, listDesigns, saveDesign } from './library';
 
@@ -17,9 +18,12 @@ describe('design library', () => {
 
   it('round-trips through an exported file', () => {
     saveDesign({ ...makeDefaultProject(), name: 'Backup me' });
-    const file = exportLibrary();
+    const collection = addUnit(makeUnit(0, { name: 'Intercessors' }))(makeDefaultCollection());
+    const file = exportLibrary(collection);
     window.localStorage.clear();
-    expect(importLibrary(file)).toBe(1);
+    const result = importLibrary(file);
+    expect(result.count).toBe(1);
+    expect(result.collection.units[0].name).toBe('Intercessors');
     expect(listDesigns()[0].project.name).toBe('Backup me');
   });
 

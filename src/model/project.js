@@ -17,7 +17,8 @@ export const BASE_PRESETS = {
   ].map(([x, y]) => ({ label: `${x} × ${y} mm`, sizeX: x, sizeY: y })),
 };
 
-export const GROUP_COLORS = ['#e74c3c', '#3498db', '#2ecc71', '#f39c12', '#9b59b6', '#1abc9c', '#e84393', '#fdcb6e'];
+// Picked to stay distinct on the dark drafting background, also in lightness.
+export const GROUP_COLORS = ['#6fd3ff', '#ffc861', '#c9a7f5', '#7bd88f', '#ff8a80', '#4fd1c5', '#f48fb1', '#e6ee9c'];
 
 export const POCKET_MODES = ['inlay', 'floor'];
 
@@ -81,41 +82,57 @@ export function makeDefaultProject() {
   };
 }
 
-const isObject = (v) => v !== null && typeof v === 'object' && !Array.isArray(v);
+/** True for the untouched starter project (ignoring generated ids). */
+export function isDefaultProject(project) {
+  const strip = (p) => JSON.stringify({ name: p.name, groups: p.groups.map((g) => ({ ...g, id: undefined })) });
+  return strip(project) === strip(makeDefaultProject());
+}
+
+export const isObject = (v) => v !== null && typeof v === 'object' && !Array.isArray(v);
 const num = (v, fallback, min = -Infinity, max = Infinity) =>
   (typeof v === 'number' && Number.isFinite(v) ? Math.min(max, Math.max(min, v)) : fallback);
 
-/** Fills in missing or invalid fields so stored or shared projects never break the app. */
-export function normalizeProject(raw) {
-  const base = makeDefaultProject();
-  if (!isObject(raw)) return base;
-  const groups = Array.isArray(raw.groups) ? raw.groups.filter(isObject).slice(0, 24).map((g, i) => {
-    const d = makeGroup(i);
-    return {
-      id: typeof g.id === 'string' ? g.id : d.id,
-      name: typeof g.name === 'string' ? g.name.slice(0, 60) : d.name,
-      shape: BASE_SHAPES.includes(g.shape) ? g.shape : d.shape,
-      sizeX: num(g.sizeX, d.sizeX, 5, 200),
-      sizeY: num(g.sizeY, d.sizeY, 5, 200),
-      count: Math.round(num(g.count, d.count, 1, 500)),
-      heightMm: num(g.heightMm, d.heightMm, 1, 300),
-      color: typeof g.color === 'string' && /^#[0-9a-f]{6}$/i.test(g.color) ? g.color : d.color,
-    };
-  }) : base.groups;
-  const pick = (defaults, given) => Object.fromEntries(Object.entries(defaults).map(([k, v]) => {
+/** Repairs one stored or shared group (also used for collection units). */
+export function normalizeGroup(g, index) {
+  const d = makeGroup(index);
+  if (!isObject(g)) return d;
+  return {
+    id: typeof g.id === 'string' ? g.id : d.id,
+    name: typeof g.name === 'string' ? g.name.slice(0, 60) : d.name,
+    shape: BASE_SHAPES.includes(g.shape) ? g.shape : d.shape,
+    sizeX: num(g.sizeX, d.sizeX, 5, 200),
+    sizeY: num(g.sizeY, d.sizeY, 5, 200),
+    count: Math.round(num(g.count, d.count, 1, 500)),
+    heightMm: num(g.heightMm, d.heightMm, 1, 300),
+    color: typeof g.color === 'string' && /^#[0-9a-f]{6}$/i.test(g.color) ? g.color : d.color,
+  };
+}
+
+/** Takes known settings from `given`, falling back to `defaults` for anything missing or invalid. */
+export function normalizeSettings(defaults, given) {
+  return Object.fromEntries(Object.entries(defaults).map(([k, v]) => {
     const g = isObject(given) ? given[k] : undefined;
     if (typeof v === 'boolean') return [k, typeof g === 'boolean' ? g : v];
     if (typeof v === 'number') return [k, num(g, v, 0, 1000)];
     if (k === 'pocketMode') return [k, POCKET_MODES.includes(g) ? g : v];
     return [k, typeof g === typeof v ? g : v];
   }));
+}
+
+/** Fills in missing or invalid fields so stored or shared projects never break the app. */
+export function normalizeProject(raw) {
+  const base = makeDefaultProject();
+  if (!isObject(raw)) return base;
+  const groups = Array.isArray(raw.groups)
+    ? raw.groups.filter(isObject).slice(0, 24).map(normalizeGroup)
+    : base.groups;
   return {
     version: 1,
     name: typeof raw.name === 'string' ? raw.name.slice(0, 80) : base.name,
     groups,
-    bin: pick(DEFAULT_BIN, raw.bin),
-    layout: pick(DEFAULT_LAYOUT, raw.layout),
-    preview: pick(DEFAULT_PREVIEW, raw.preview),
+    bin: normalizeSettings(DEFAULT_BIN, raw.bin),
+    layout: normalizeSettings(DEFAULT_LAYOUT, raw.layout),
+    preview: normalizeSettings(DEFAULT_PREVIEW, raw.preview),
   };
 }
 

@@ -26,10 +26,10 @@ function useManifoldGeometry(wasm, build, key) {
   return geometry;
 }
 
-function Part({ meshRef, geometry, color, opacity, wireframe, cut, z = 0 }) {
+function Part({ geometry, color, opacity, wireframe, cut, z = 0 }) {
   if (!geometry) return null;
   return (
-    <mesh ref={meshRef} geometry={geometry} position={[0, 0, z]}>
+    <mesh geometry={geometry} position={[0, 0, z]}>
       <meshStandardMaterial
         color={color}
         roughness={0.55}
@@ -87,7 +87,7 @@ function MiniGhosts({ plan, highlightId, cut }) {
 }
 
 /** Everything printable plus preview helpers, in model coordinates (Z up, millimetres). */
-function Scene({ wasm, project, plan, view, highlightId, binRef, inlayRef }) {
+function Scene({ wasm, project, plan, view, highlightId }) {
   const { preview } = project;
   const cut = view === 'cut';
   const binKey = JSON.stringify([plan.unitsX, plan.unitsY, plan.heightMm, project.bin, preview.segments,
@@ -100,12 +100,12 @@ function Scene({ wasm, project, plan, view, highlightId, binRef, inlayRef }) {
 
   return (
     <group>
-      <Part meshRef={binRef} geometry={binGeometry} color={preview.color} opacity={1} wireframe={preview.wireframe} cut={cut} />
+      <Part geometry={binGeometry} color={preview.color} opacity={1} wireframe={preview.wireframe} cut={cut} />
       {plan.inlay && (
-        <Part meshRef={inlayRef} geometry={inlayGeometry} color="#d9dde3" opacity={1} wireframe={preview.wireframe} cut={cut} z={plan.floorZ + 0.01} />
+        <Part geometry={inlayGeometry} color="#d9dde3" opacity={1} wireframe={preview.wireframe} cut={cut} z={plan.floorZ + 0.01} />
       )}
       <PocketMarkers project={project} plan={plan} highlightId={highlightId} cut={cut} />
-      {preview.showMinis && view !== 'top' && <MiniGhosts plan={plan} highlightId={highlightId} cut={cut} />}
+      {preview.showMinis && <MiniGhosts plan={plan} highlightId={highlightId} cut={cut} />}
     </group>
   );
 }
