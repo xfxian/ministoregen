@@ -16,8 +16,9 @@ function roundedRect(w, h, r, props) {
 /**
  * Top view of a bin as a technical drawing: outline, lip opening, grid cells and every
  * pocket in its group colour (spare pockets dashed). `detailed` adds dimension lines.
+ * `maxPxPerMm` stops small bins from being blown up to fill a large container.
  */
-function PlanDrawing({ project, plan, detailed = false, highlightId = null, label }) {
+function PlanDrawing({ project, plan, detailed = false, highlightId = null, label, maxPxPerMm }) {
   const W = outerSize(plan.unitsX);
   const L = outerSize(plan.unitsY);
   const pad = detailed ? Math.max(W, L) * 0.1 + 6 : 3;
@@ -31,7 +32,12 @@ function PlanDrawing({ project, plan, detailed = false, highlightId = null, labe
   return (
     <svg
       viewBox={`${left} ${top} ${W + 2 * pad} ${L + 2 * pad}`}
-      style={{ width: '100%', height: '100%', display: 'block' }}
+      style={{
+        width: '100%',
+        height: '100%',
+        display: 'block',
+        ...(maxPxPerMm && { maxWidth: (W + 2 * pad) * maxPxPerMm, maxHeight: (L + 2 * pad) * maxPxPerMm }),
+      }}
       role="img"
       aria-label={label ?? `Top view: ${plan.unitsX} by ${plan.unitsY} grid cells`}
     >

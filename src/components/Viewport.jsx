@@ -6,18 +6,42 @@ import { useManifold } from '../geometry/manifoldLoader';
 import { patchPreview } from '../state/updates';
 import { tokens } from '../theme';
 import Scene from './Scene';
+import { minDistanceForScale, wheelZoomSpeed } from './viewScale';
 
-/** Re-frames the camera when the view or the bin size changes. */
+/**
+ * Re-frames the camera when the view or the bin size changes. Small bins are not
+ * zoomed past MAX_PX_PER_MM, so a 1x1 bin does not fill a big screen.
+ */
 function Framing({ view, sizeKey }) {
   const bounds = useBounds();
-  const { camera } = useThree();
+  const { camera, get } = useThree();
   useEffect(() => {
     if (view === 'cut') camera.position.set(400, 120, 0);
     else camera.position.set(260, 220, 300);
     camera.up.set(0, 1, 0);
-    const timer = setTimeout(() => bounds.refresh().clip().fit(), 30);
+    const timer = setTimeout(() => {
+      const { center, distance } = bounds.refresh().clip().getSize();
+      const minDistance = minDistanceForScale(camera.fov, get().size.height);
+      const direction = camera.position.clone().sub(center).normalize();
+      const position = center.clone().addScaledVector(direction, Math.max(distance, minDistance));
+      bounds.moveTo(position).lookAt({ target: center });
+    }, 30);
     return () => clearTimeout(timer);
-  }, [view, sizeKey, bounds, camera]);
+  }, [view, sizeKey, bounds, camera, get]);
+  return null;
+}
+
+/** Makes each wheel event zoom in proportion to how far it scrolled; see wheelZoomSpeed. */
+function WheelZoom() {
+  const { gl, controls } = useThree();
+  useEffect(() => {
+    const parent = gl.domElement.parentElement;
+    if (!parent || !controls) return undefined;
+    // Capture on the parent runs before OrbitControls' own listener on the canvas.
+    const onWheel = (event) => { controls.zoomSpeed = wheelZoomSpeed(event); };
+    parent.addEventListener('wheel', onWheel, { capture: true, passive: true });
+    return () => parent.removeEventListener('wheel', onWheel, { capture: true });
+  }, [gl, controls]);
   return null;
 }
 
@@ -41,6 +65,7 @@ function Viewport({ project, plan, view, onUpdate, highlightId }) {
           <Framing view={view} sizeKey={sizeKey} />
         </Bounds>
         <OrbitControls makeDefault enableDamping={false} />
+        <WheelZoom />
       </Canvas>
 
       <Box sx={{ position: 'absolute', top: 10, right: 10, display: 'flex', flexDirection: 'column', alignItems: 'stretch', px: 1, py: 0.25, borderRadius: 1, bgcolor: 'rgba(23,29,36,0.9)', border: `1px solid ${tokens.line}` }}>
