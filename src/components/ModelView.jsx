@@ -2,6 +2,7 @@ import { Box, ToggleButton, ToggleButtonGroup } from '@mui/material';
 import { lazy, Suspense, useState } from 'react';
 import { gridPaper, tokens } from '../theme';
 import PlanDrawing from './PlanDrawing';
+import { MAX_PX_PER_MM } from './viewScale';
 
 // The 3D view pulls in three.js; load it only when someone opens it.
 const Viewport = lazy(() => import('./Viewport'));
@@ -29,8 +30,8 @@ function ModelView({ project, plan, onUpdate, highlightId, minHeight = 320 }) {
       </ToggleButtonGroup>
       <Box sx={{ flex: 1, minHeight: 0, position: 'relative', borderRadius: 1, border: `1px solid ${tokens.line}`, overflow: 'hidden', ...gridPaper }}>
         {view === 'plan' ? (
-          <Box sx={{ position: 'absolute', inset: 0, p: 2 }}>
-            <PlanDrawing project={project} plan={plan} detailed highlightId={highlightId} />
+          <Box sx={{ position: 'absolute', inset: 0, p: 2, display: 'grid', placeItems: 'center' }}>
+            <PlanDrawing project={project} plan={plan} detailed highlightId={highlightId} maxPxPerMm={MAX_PX_PER_MM} />
           </Box>
         ) : (
           <Box sx={{ position: 'absolute', inset: 0 }}>
