@@ -3,7 +3,7 @@ import { Box, Button, ButtonBase, Typography, useMediaQuery } from '@mui/materia
 import { useRef, useState } from 'react';
 import {
   addCase, addUnit, assignRemaining, assignedCount, distribute, makeCase, makeUnit, patchUnit, removeUnit,
-  setKeepTogether, unassigned,
+  setSortMode, unassigned, unitTotal,
 } from '../../model/collection';
 import { isDefaultProject } from '../../model/project';
 import { gridPaper, overline, tokens } from '../../theme';
@@ -42,7 +42,7 @@ function EmptyCollection({ onAdd, onImportSingle, singleGroups, onSwitchToSingle
         List what you own. The cases follow.
       </Typography>
       <Typography sx={{ color: tokens.muted, fontSize: 17, lineHeight: 1.5 }}>
-        Add each unit once: base, height and how many. Then sort them into Gridfinity cases automatically,
+        Add each unit once: its models with base, height and how many. Then sort them into Gridfinity cases automatically,
         or by hand. Everything stays in this browser.
       </Typography>
       <Box sx={{ display: 'flex', gap: 1.5, flexWrap: 'wrap', mt: 1 }}>
@@ -74,7 +74,8 @@ function CollectionView({
   const stacked = useMediaQuery('(max-width: 899.95px)');
   const selected = cases.find((c) => c.caseItem.id === selectedId) ?? cases[0];
   const statuses = Object.fromEntries(cases.map((c) => [c.caseItem.id, c.status]));
-  const total = collection.units.reduce((n, u) => n + u.count, 0);
+  const total = collection.units.reduce((n, u) => n + unitTotal(u), 0);
+  const modelCount = collection.units.reduce((n, u) => n + u.models.length, 0);
   const waiting = unassigned(collection).reduce((n, w) => n + w.count, 0);
 
   // Discrete actions get their own undo step.
@@ -116,7 +117,7 @@ function CollectionView({
 
   const importSingle = () => {
     commit((c) => singleProject.groups.reduce(
-      (acc, g, i) => addUnit(makeUnit(acc.units.length + i, { ...g, id: undefined }))(acc), c,
+      (acc, g) => addUnit(makeUnit(acc.units.length, { ...g, id: undefined }))(acc), c,
     ));
   };
 
@@ -133,7 +134,7 @@ function CollectionView({
           <UnitDialog
             unit={dialog.unit}
             isNew
-            storedCount={0}
+            storedCount={() => 0}
             onSave={(unit) => { commit(addUnit(unit)); setDialog(null); }}
             onClose={() => setDialog(null)}
           />
@@ -154,7 +155,7 @@ function CollectionView({
                 : `${total} minis in ${collection.cases.length} case${collection.cases.length === 1 ? '' : 's'}`}
             </Typography>
           </Box>
-          <Button variant="outlined" startIcon={<Add />} onClick={() => setDialog({ unit: makeUnit(collection.units.length), isNew: true })}>Add unit</Button>
+          <Button variant="outlined" startIcon={<Add />} onClick={() => setDialog({ unit: makeUnit(modelCount), isNew: true })}>Add unit</Button>
         </Box>
 
         <Box component="section" aria-label="Units" sx={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 160px), 1fr))', gap: 1.5 }}>
@@ -168,7 +169,7 @@ function CollectionView({
           statuses={statuses}
           onAssign={assign}
           onSort={sort}
-          onKeepTogether={(v) => commit(setKeepTogether(v))}
+          onSortMode={(mode) => commit(setSortMode(mode))}
         />
 
         <Box component="section" aria-labelledby="cases-title" sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
@@ -226,7 +227,8 @@ function CollectionView({
         <UnitDialog
           unit={dialog.unit}
           isNew={dialog.isNew}
-          storedCount={dialog.isNew ? 0 : assignedCount(collection, dialog.unit.id)}
+          storedCount={(modelId) => assignedCount(collection, dialog.unit.id, modelId)}
+          colorIndex={modelCount}
           onSave={(unit) => {
             commit(dialog.isNew ? addUnit(unit) : patchUnit(unit.id, unit));
             setDialog(null);

@@ -42,6 +42,27 @@ test('units wait on the shelf until they are sorted into cases', () => {
   expect(screen.getByRole('button', { name: /^Case 1: / })).toBeInTheDocument();
 });
 
+test('a unit can mix models on different bases, and they stay together in one case', () => {
+  render(<App />);
+  fireEvent.click(screen.getByRole('button', { name: /add your first unit/i }));
+  const dialog = screen.getByRole('dialog');
+  fireEvent.change(within(dialog).getByLabelText('Name'), { target: { value: 'Twin Lance' } });
+  fireEvent.change(within(dialog).getByLabelText('How many'), { target: { value: '2' } });
+  fireEvent.click(within(dialog).getByRole('button', { name: 'Add a different model' }));
+  const models = within(dialog).getAllByLabelText('Model');
+  fireEvent.change(models[0], { target: { value: 'Battlesuit' } });
+  fireEvent.change(models[1], { target: { value: 'Drone' } });
+  fireEvent.change(within(dialog).getAllByLabelText('How many')[1], { target: { value: '4' } });
+  fireEvent.change(within(dialog).getAllByLabelText('Overhang')[0], { target: { value: '10' } });
+  fireEvent.click(within(dialog).getByRole('button', { name: 'Add' }));
+  expect(screen.getByTestId('collection-summary')).toHaveTextContent('6 minis, 6 still need a home');
+  fireEvent.click(screen.getByRole('button', { name: 'Sort into cases' }));
+  expect(screen.getByTestId('collection-summary')).toHaveTextContent('6 minis in 1 case');
+  const detail = screen.getByRole('complementary', { name: 'Selected case' });
+  expect(within(detail).getByText('Twin Lance · Battlesuit')).toBeInTheDocument();
+  expect(within(detail).getByText('Twin Lance · Drone')).toBeInTheDocument();
+});
+
 test('a unit can be moved into a case from its shelf menu, and taken out again', () => {
   render(<App />);
   addUnit('Intercessors', 3);
