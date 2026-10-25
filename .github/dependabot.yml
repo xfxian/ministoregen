@@ -5,6 +5,7 @@ updates:
     schedule:
       interval: monthly
     open-pull-requests-limit: 5
+    labels: ["release:patch"]
     groups:
       runtime:
         dependency-type: production
@@ -15,6 +16,7 @@ updates:
 
   - package-ecosystem: github-actions
     directory: /
+    labels: ["release:none"]
     schedule:
       interval: monthly
     groups:

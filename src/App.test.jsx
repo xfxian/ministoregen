@@ -1,6 +1,7 @@
 import { fireEvent, render, screen, within } from '@testing-library/react';
 import { beforeEach, vi } from 'vitest';
 import App from './App';
+import { versionInfo } from './version';
 
 vi.mock('./components/Viewport', () => ({ default: () => null }));
 
@@ -23,6 +24,11 @@ test('starts with an empty collection and a way to skip it', () => {
   fireEvent.click(screen.getByRole('button', { name: 'Switch to Single bin' }));
   expect(screen.getByTestId('bin-summary')).toHaveTextContent(/\d × \d units, \d+u high/);
   expect(screen.getByTestId('fit-ok')).toHaveTextContent('All 10 miniatures fit');
+});
+
+test('shows the version in the header', () => {
+  render(<App />);
+  expect(screen.getByTestId('app-version')).toHaveTextContent(versionInfo().label);
 });
 
 test('units wait on the shelf until they are sorted into cases', () => {

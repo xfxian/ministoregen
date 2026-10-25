@@ -25,30 +25,14 @@ jobs:
       - run: npm run lint
       - run: npm test
       - run: npm run build
+        env:
+          # Previews show which pull request they come from; other builds
+          # fall back to `git describe`. Releases are stamped by release.yml.
+          APP_VERSION: ${{ github.event_name == 'pull_request' && format('preview-pr{0}', github.event.number) || '' }}
       - uses: actions/upload-artifact@v4
         with:
           name: dist
           path: ./dist
-
-  deploy-main:
-    runs-on: ubuntu-latest
-    needs: build
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
-    concurrency:
-      group: pages-main
-      cancel-in-progress: true
-    permissions:
-      contents: write
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/download-artifact@v4
-        with:
-          name: dist
-          path: ./dist
-      - uses: JamesIves/github-pages-deploy-action@v4
-        with:
-          folder: ./dist
-          clean-exclude: pr-preview/
 
   deploy-preview:
     runs-on: ubuntu-latest

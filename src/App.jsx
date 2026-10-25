@@ -16,8 +16,10 @@ import { saveDesign } from './state/library';
 import { useCollection } from './state/useCollection';
 import { hasSharedProject, shareUrl, useProject } from './state/useProject';
 import { theme, tokens } from './theme';
+import { versionInfo } from './version';
 
 const MODE_KEY = 'ministoregen.mode';
+const VERSION = versionInfo();
 
 function initialMode() {
   if (hasSharedProject()) return 'single';
@@ -152,6 +154,17 @@ function App() {
         >
           <Typography component="span" sx={{ fontFamily: tokens.mono, fontWeight: 700, letterSpacing: { xs: '0.08em', sm: '0.14em' }, fontSize: { xs: 12, md: 15 }, mr: { xs: 1, md: 1 } }}>
             MINISTOREGEN
+          </Typography>
+          <Typography
+            component={VERSION.url ? 'a' : 'span'}
+            href={VERSION.url ?? undefined}
+            target={VERSION.url ? '_blank' : undefined}
+            rel={VERSION.url ? 'noopener noreferrer' : undefined}
+            title={VERSION.title}
+            data-testid="app-version"
+            sx={{ fontFamily: tokens.mono, fontSize: 11, color: tokens.muted, textDecoration: 'none', ml: { xs: -0.75, md: -1 }, mr: { xs: 1, md: 1 }, '&:hover': VERSION.url ? { color: tokens.text, textDecoration: 'underline' } : undefined }}
+          >
+            {VERSION.label}
           </Typography>
           <ToggleButtonGroup
             exclusive
