@@ -1,12 +1,20 @@
 import { FormControlLabel, Stack, Switch, ToggleButton, ToggleButtonGroup, Typography } from '@mui/material';
 import { HEIGHT_UNIT, LIP_HEIGHT, LIP_TIP } from '../geometry/gridfinity';
+import { LID_SNAP_DEPTH } from '../geometry/lid';
 import { patchBin, patchLayout } from '../state/updates';
 import Stepper from './Stepper';
 
-function Toggle({ label, checked, onChange, help }) {
+const LID_HELP = {
+  none: 'Bins stack straight on each other.',
+  flat: 'A flat lid that seats in the stacking lip, so it cannot slide off.',
+  stackable: 'Seats in the lip and has a baseplate grid on top, so other bins stack on the lid.',
+  needsLip: 'Lids sit in the stacking lip. Turn the lip on to add one.',
+};
+
+function Toggle({ label, checked, onChange, help, disabled = false }) {
   return (
     <FormControlLabel
-      control={<Switch size="small" checked={checked} onChange={(e) => onChange(e.target.checked)} />}
+      control={<Switch size="small" checked={checked} disabled={disabled} onChange={(e) => onChange(e.target.checked)} />}
       label={<span>{label}{help && <Typography component="span" variant="caption" color="text.secondary" sx={{ display: 'block' }}>{help}</Typography>}</span>}
       labelPlacement="start"
       sx={{ mx: 0, width: '100%', justifyContent: 'space-between' }}
@@ -25,7 +33,7 @@ function BinStep({ project, plan, onUpdate }) {
         {plan.unitsX} × {plan.unitsY} units, {plan.heightUnits}u high
       </Typography>
       <Typography variant="caption" color="text.secondary" sx={{ mt: '0 !important' }}>
-        {plan.unitsX * 42} × {plan.unitsY * 42} mm grid footprint, {totalHeight.toFixed(1)} mm tall{bin.lip ? ' including the stacking lip' : ''}
+        {plan.unitsX * 42} × {plan.unitsY * 42} mm grid footprint, {totalHeight.toFixed(1)} mm tall{bin.lip ? ' including the stacking lip' : ''}{plan.lid ? `, plus a ${plan.lid.height.toFixed(1)} mm lid` : ''}
       </Typography>
 
       <div>
@@ -59,6 +67,31 @@ function BinStep({ project, plan, onUpdate }) {
       )}
       <Toggle label="Stacking lip" help="Lets other Gridfinity bins stack on top" checked={bin.lip} onChange={(v) => set({ lip: v })} />
       <Toggle label="Gridfinity feet" help="Off for a flat bottom" checked={bin.feet} onChange={(v) => set({ feet: v })} />
+
+      <div>
+        <Typography variant="overline" color="text.secondary">Lid</Typography>
+        <ToggleButtonGroup
+          exclusive fullWidth size="small"
+          value={bin.lip ? bin.lid : 'none'}
+          disabled={!bin.lip}
+          onChange={(_, v) => v && set({ lid: v })}
+          aria-label="Lid"
+        >
+          <ToggleButton value="none">None</ToggleButton>
+          <ToggleButton value="flat">Flat</ToggleButton>
+          <ToggleButton value="stackable">Stackable</ToggleButton>
+        </ToggleButtonGroup>
+        <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.5 }}>
+          {LID_HELP[bin.lip ? bin.lid : 'needsLip']}
+        </Typography>
+      </div>
+      <Toggle
+        label="Snap clips"
+        help={`Clips catch under the lip so the lid stays on until you pull it off. Needs ${LID_SNAP_DEPTH.toFixed(1)} mm more headroom.`}
+        checked={bin.lidSnap}
+        disabled={!bin.lip || bin.lid === 'none'}
+        onChange={(v) => set({ lidSnap: v })}
+      />
     </Stack>
   );
 }

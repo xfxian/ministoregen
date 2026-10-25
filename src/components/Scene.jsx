@@ -1,7 +1,9 @@
 import { useEffect, useMemo } from 'react';
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
-import { buildBinPart, buildInlayPart } from '../geometry/parts';
+import { LID_SNAP_DROP } from '../geometry/lid';
+import { buildBinPart, buildInlayPart, buildLidPart } from '../geometry/parts';
+import { STACKED_FOOT_DROP } from '../model/layout';
 import { toBufferGeometry } from '../geometry/toBufferGeometry';
 import { placeOutline, pocketOutline } from '../model/pockets';
 
@@ -100,12 +102,20 @@ function Scene({ wasm, project, plan, view, highlightId }) {
 
   const binGeometry = useManifoldGeometry(wasm, () => buildBinPart(wasm, project, plan), binKey);
   const inlayGeometry = useManifoldGeometry(wasm, () => (plan.inlay ? buildInlayPart(wasm, project, plan) : null), inlayKey);
+  const lidKey = JSON.stringify([plan.unitsX, plan.unitsY, plan.lid, preview.segments]);
+  const lidGeometry = useManifoldGeometry(wasm, () => buildLidPart(wasm, project, plan), lidKey);
+  // Seated in the cut view, to show how it locks in; lifted off otherwise, to show the pockets.
+  const lidSeat = plan.lid ? plan.heightMm - (plan.lid.snap ? LID_SNAP_DROP : STACKED_FOOT_DROP) : 0;
+  const lidZ = cut ? lidSeat : lidSeat + 18;
 
   return (
     <group>
       <Part geometry={binGeometry} color={preview.color} opacity={1} wireframe={preview.wireframe} cut={cut} />
       {plan.inlay && (
         <Part geometry={inlayGeometry} color="#d9dde3" opacity={1} wireframe={preview.wireframe} cut={cut} z={plan.floorZ + 0.01} />
+      )}
+      {plan.lid && preview.showLid && (
+        <Part geometry={lidGeometry} color="#c3cad3" opacity={1} wireframe={preview.wireframe} cut={cut} z={lidZ} />
       )}
       <PocketMarkers project={project} plan={plan} highlightId={highlightId} cut={cut} />
       {preview.showMinis && <MiniGhosts plan={plan} highlightId={highlightId} cut={cut} />}

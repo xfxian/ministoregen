@@ -273,7 +273,10 @@ export function caseStatus(plan) {
   const pockets = plan.strips.reduce((n, s) => n + s.capacity, 0);
   if (minis === 0) return { kind: 'empty', label: 'Empty', minis, pockets };
   if (plan.warnings.some((w) => w.severity === 'error')) return { kind: 'error', label: 'Does not fit', minis, pockets };
-  if (plan.warnings.length) return { kind: 'warning', label: 'Too low', minis, pockets };
+  if (plan.warnings.length) {
+    const label = plan.warnings.some((w) => w.id.startsWith('tall-')) ? 'Too low' : 'Check settings';
+    return { kind: 'warning', label, minis, pockets };
+  }
   const spare = pockets - minis;
   return { kind: 'ok', label: spare > 0 ? `${spare} spare` : 'Full', minis, pockets };
 }

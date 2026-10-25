@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { HEIGHT_UNIT, throatSize } from '../geometry/gridfinity';
+import { LID_SNAP_DROP } from '../geometry/lid';
 import { STACKED_FOOT_DROP, layoutStrip, minStripLength, planProject } from './layout';
 import { DEFAULT_LAYOUT, decodeProject, encodeProject, makeDefaultProject, makeGroup, normalizeProject } from './project';
 
@@ -104,6 +105,23 @@ describe('planProject', () => {
   it('reports collections that need more than one bin', () => {
     const plan = planProject(project([makeGroup(0, { sizeX: 60, sizeY: 60, count: 60 })]));
     expect(plan.warnings[0].id).toBe('too-big');
+  });
+});
+
+describe('lids', () => {
+  it('leaves room for snap clips above the tallest miniature', () => {
+    const groups = [makeGroup(0, { heightMm: 30 })];
+    const flat = planProject(project(groups, { lid: 'flat' }));
+    const snap = planProject(project(groups, { lid: 'stackable', lidSnap: true }));
+    expect(flat.lid).toMatchObject({ style: 'flat', snap: false });
+    expect(snap.floorZ + 30 + LID_SNAP_DROP).toBeLessThanOrEqual(snap.heightMm);
+    expect(snap.heightMm).toBeGreaterThanOrEqual(flat.heightMm);
+  });
+
+  it('drops the lid and says why when the bin has no stacking lip', () => {
+    const plan = planProject(project([makeGroup(0)], { lid: 'flat', lip: false }));
+    expect(plan.lid).toBeNull();
+    expect(plan.warnings.find((w) => w.id === 'lid-needs-lip').fix.bin).toEqual({ lip: true });
   });
 });
 
