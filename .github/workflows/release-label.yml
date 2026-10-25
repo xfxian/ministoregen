@@ -1,0 +1,92 @@
+name: Release label
+
+# Every pull request says what its merge releases: exactly one of
+# release:major, release:minor, release:patch or release:none.
+# See docs/VERSIONING.md. Make "Release label" a required check on main.
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, reopened, synchronize, labeled, unlabeled]
+
+permissions:
+  contents: read
+  issues: write # create the release:* labels if they are missing
+  pull-requests: read
+
+# A pull request is usually opened and labelled seconds apart, which starts
+# two runs. Only the newest run per pull request counts.
+concurrency:
+  group: release-label-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  label:
+    name: Release label
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # tags for the summary
+
+      - name: Ensure the release labels exist
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          have=$(gh label list --limit 200 --json name --jq '.[].name')
+          create() {
+            echo "$have" | grep -qx "$1" || gh label create "$1" --color "$2" --description "$3" || true
+          }
+          create release:major B60205 "Merge publishes a new major version (breaking change)"
+          create release:minor 0E8A16 "Merge publishes a new minor version (new feature)"
+          create release:patch 1D76DB "Merge publishes a new patch version (fix)"
+          create release:none  C5DEF5 "Merge publishes no release (docs, CI, tests)"
+
+      - name: Exactly one release label
+        id: kind
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR: ${{ github.event.pull_request.number }}
+          ACTION: ${{ github.event.action }}
+        run: |
+          # Read the labels as they are now, not as the event saw them. A
+          # pull request that was just opened gets a short grace period for
+          # its label to arrive (the labelled run then replaces this one).
+          kinds() {
+            gh api "repos/$GITHUB_REPOSITORY/issues/$PR/labels" --jq '.[].name | select(startswith("release:")) | sub("^release:"; "")'
+          }
+          k=$(kinds)
+          if [ -z "$k" ] && { [ "$ACTION" = opened ] || [ "$ACTION" = reopened ]; }; then
+            for _ in 1 2 3 4 5 6; do
+              sleep 10
+              k=$(kinds)
+              [ -n "$k" ] && break
+            done
+          fi
+          n=$(echo "$k" | grep -c . || true)
+          if [ "$n" -ne 1 ]; then
+            echo "::error::Set exactly one label: release:major, release:minor, release:patch or release:none (found $n). See docs/VERSIONING.md."
+            exit 1
+          fi
+          case "$k" in
+            major|minor|patch|none) ;;
+            *) echo "::error::Unknown release label release:$k"; exit 1 ;;
+          esac
+          echo "kind=$k" >> "$GITHUB_OUTPUT"
+
+      - name: Summary
+        env:
+          KIND: ${{ steps.kind.outputs.kind }}
+        run: |
+          current=$(git tag --list 'v[0-9]*.[0-9]*.[0-9]*' | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | sort -V | tail -n 1 || true)
+          next=$(scripts/next-version.sh "$KIND")
+          {
+            echo "### Release on merge"
+            echo
+            echo "| Current | Label | After merge |"
+            echo "|---------|-------|-------------|"
+            echo "| ${current:-none} | release:$KIND | ${next:-no release} |"
+            echo
+            echo "_Computed from the tags at the time of this run; a merge that lands first moves it up._"
+          } >> "$GITHUB_STEP_SUMMARY"
+          echo "release:$KIND -> ${next:-no release}"

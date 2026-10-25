@@ -1,0 +1,145 @@
+name: Release
+
+# After CI passes on main: takes the highest release:* label among the pull
+# requests merged since the latest v* tag, and if that is above release:none,
+# builds the site with the new version stamped in, deploys it to GitHub
+# Pages, tags the commit and publishes a GitHub Release with the user notes
+# and the built site as a zip. See docs/VERSIONING.md.
+
+on:
+  workflow_run:
+    workflows: [ministoregen]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      sha:
+        description: "Commit on main to release (default: tip of main)"
+        required: false
+      version:
+        description: "Exact version to publish, e.g. v1.0.0 (default: from the labels)"
+        required: false
+
+permissions:
+  contents: write
+  pull-requests: read
+
+# Runs are serialised so versions never come out of order.
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    name: Release
+    if: github.event_name == 'workflow_dispatch' || (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Work out the version
+        id: plan
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          SHA: ${{ github.event.workflow_run.head_sha || inputs.sha || github.sha }}
+          WANT: ${{ inputs.version }}
+        run: |
+          sha=$(git rev-parse "$SHA")
+          echo "sha=$sha" >> "$GITHUB_OUTPUT"
+          latest=$(git tag --list 'v[0-9]*.[0-9]*.[0-9]*' | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | sort -V | tail -n 1 || true)
+          echo "latest=$latest" >> "$GITHUB_OUTPUT"
+
+          if [ -n "$WANT" ]; then
+            echo "$WANT" | grep -qE '^v[0-9]+\.[0-9]+\.[0-9]+$' || { echo "::error::version must look like v1.2.3"; exit 1; }
+            if [ -n "$latest" ] && { [ "$(printf '%s\n%s\n' "$latest" "$WANT" | sort -V | tail -n 1)" != "$WANT" ] || [ "$latest" = "$WANT" ]; }; then
+              echo "::error::$WANT is not above $latest"; exit 1
+            fi
+            echo "Releasing $WANT (explicit) at $sha"
+            echo "version=$WANT" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          if [ -z "$latest" ]; then
+            commits=$sha # first release: only the pull request of this commit
+          elif git merge-base --is-ancestor "$sha" "$latest"; then
+            echo "$sha is already part of $latest, nothing to release."
+            exit 0
+          else
+            commits=$(git rev-list "$latest..$sha")
+          fi
+
+          rank() { case "$1" in major) echo 3 ;; minor) echo 2 ;; patch) echo 1 ;; *) echo 0 ;; esac; }
+          kind=none
+          seen=" "
+          for c in $commits; do
+            prs=$(gh api "repos/$REPO/commits/$c/pulls" --jq '.[] | select(.merged_at != null and .base.ref == "main") | .number')
+            for pr in $prs; do
+              case "$seen" in *" $pr "*) continue ;; esac
+              seen="$seen$pr "
+              labels=$(gh api "repos/$REPO/issues/$pr/labels" --jq '.[].name | select(startswith("release:")) | sub("^release:"; "")')
+              for l in $labels; do
+                echo "#$pr: release:$l"
+                [ "$(rank "$l")" -gt "$(rank "$kind")" ] && kind=$l
+              done
+            done
+          done
+
+          if [ "$kind" = none ]; then
+            echo "No release label above release:none since ${latest:-the beginning}, nothing to release."
+            exit 0
+          fi
+          version=$(scripts/next-version.sh "$kind")
+          echo "Releasing $version ($kind) at $sha"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      - name: Release notes
+        if: steps.plan.outputs.version != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          LATEST: ${{ steps.plan.outputs.latest }}
+          SHA: ${{ steps.plan.outputs.sha }}
+        run: |
+          scripts/release-notes.sh "$LATEST" "$SHA" > "$RUNNER_TEMP/notes.md"
+          cat "$RUNNER_TEMP/notes.md"
+
+      - name: Check out the release commit
+        if: steps.plan.outputs.version != ''
+        run: git checkout --detach "${{ steps.plan.outputs.sha }}"
+
+      - uses: actions/setup-node@v4
+        if: steps.plan.outputs.version != ''
+        with:
+          node-version: 22.x
+          cache: npm
+
+      - name: Build
+        if: steps.plan.outputs.version != ''
+        env:
+          APP_VERSION: ${{ steps.plan.outputs.version }}
+        run: |
+          npm ci
+          npm run build
+          (cd dist && zip -qr "$RUNNER_TEMP/ministoregen-$APP_VERSION.zip" .)
+
+      - name: Deploy to GitHub Pages
+        if: steps.plan.outputs.version != ''
+        uses: JamesIves/github-pages-deploy-action@v4
+        with:
+          folder: ./dist
+          clean-exclude: pr-preview/
+
+      - name: Publish the release
+        if: steps.plan.outputs.version != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          VERSION: ${{ steps.plan.outputs.version }}
+          SHA: ${{ steps.plan.outputs.sha }}
+        run: |
+          gh release create "$VERSION" "$RUNNER_TEMP/ministoregen-$VERSION.zip" \
+            --repo "$REPO" --target "$SHA" --title "ministoregen $VERSION" --notes-file "$RUNNER_TEMP/notes.md"

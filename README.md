@@ -54,7 +54,7 @@ Contributor and agent workflow notes live in `AGENTS.md`.
 
 ## CI/CD
 
-Pull requests are linted, tested, built and get a preview deployment. Pushes to `main` deploy to GitHub Pages. Dependabot opens grouped dependency updates once a month.
+Pull requests are linted, tested, built and get a preview deployment. Each pull request carries a semver release label; after a merge, `main` is tagged, released and deployed to GitHub Pages (see [docs/VERSIONING.md](docs/VERSIONING.md) and the [releases](https://github.com/xfxian/ministoregen/releases)). The app shows its version in the header. Dependabot opens grouped dependency updates once a month.
 
 ## Credits
 

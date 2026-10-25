@@ -7,7 +7,8 @@ Web app that generates 3D-printable Gridfinity bins and inlays for storing table
 - Branches: `<type>/<short-kebab-topic>` with type one of feat, fix, docs, chore, refactor, ci, test. One branch per PR.
 - Every change goes through a PR; merges use GitHub rebase merge. Never merge `main` into a branch; rebase instead.
 - A PR is ready when CI is green and it is rebased on current `main`.
-- PR bodies follow `.github/pull_request_template.md`, including "User notes" for end users.
+- PR bodies follow `.github/pull_request_template.md`, including "User notes" for end users; they become the release notes.
+- Every PR carries exactly one release label: `release:major`, `release:minor`, `release:patch` or `release:none`. Merges to `main` release and deploy automatically; see `docs/VERSIONING.md`.
 - Visual changes get screenshots in the PR.
 - English everywhere in the repo: code, comments, docs, commits, PR text.
 
