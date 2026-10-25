@@ -1,4 +1,4 @@
-import { pocketOutline } from '../model/pockets';
+import { placeOutline, pocketOutline } from '../model/pockets';
 import { buildGridfinityBin } from './gridfinity';
 
 /** Union of all pocket outlines of a plan as one CrossSection, in bin coordinates. */
@@ -7,9 +7,8 @@ function pocketSection(wasm, project, plan, segments) {
   const sections = [];
   for (const strip of plan.strips) {
     if (!strip.positions.length) continue;
-    const outline = CrossSection.ofPolygons([pocketOutline(strip.group, project.layout, segments)]);
-    for (const [x, y] of strip.positions) sections.push(outline.translate(x, y));
-    outline.delete();
+    const outline = pocketOutline(strip.group, project.layout, segments);
+    for (const position of strip.positions) sections.push(CrossSection.ofPolygons([placeOutline(outline, position)]));
   }
   if (!sections.length) return null;
   const union = CrossSection.union(sections);
