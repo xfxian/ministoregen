@@ -2,7 +2,7 @@
 import Module from 'manifold-3d';
 import { beforeAll, describe, expect, it } from 'vitest';
 import {
-  LIP_HEIGHT, LIP_TIP, buildGridfinityBin, minBodyHeight, outerSize, throatSize, unitsForInnerSize,
+  DEFAULT_WALL, LIP_HEIGHT, LIP_TIP, buildGridfinityBin, minBodyHeight, outerSize, throatSize, unitsForInnerSize,
 } from './gridfinity';
 
 let wasm;
@@ -50,7 +50,7 @@ describe('buildGridfinityBin', () => {
 
   it('clamps heights that leave no room below the lip', () => {
     const m = bin({ heightMm: 2 });
-    const min = minBodyHeight({ feet: true, floor: 1.2, wall: 0.95, lip: true });
+    const min = minBodyHeight({ feet: true, floor: 1.2, wall: DEFAULT_WALL, lip: true });
     expect(m.boundingBox().max[2]).toBeCloseTo(min + LIP_HEIGHT - LIP_TIP, 3);
     m.delete();
   });

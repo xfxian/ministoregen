@@ -1,6 +1,6 @@
 import { placeOutline, pocketOutline } from '../model/pockets';
 import { buildGridfinityBin } from './gridfinity';
-import { buildLid } from './lid';
+import { buildLid, buildSnapGrooves } from './lid';
 
 /** Union of all pocket outlines of a plan as one CrossSection, in bin coordinates. */
 function pocketSection(wasm, project, plan, segments) {
@@ -26,14 +26,23 @@ function cutPockets(wasm, solid, pockets, zBottom, depth) {
   return result;
 }
 
+function cutSnapGrooves(wasm, solid, plan) {
+  if (!plan.lid?.snap) return solid;
+  const grooves = buildSnapGrooves(wasm, plan);
+  const result = solid.subtract(grooves);
+  [grooves, solid].forEach((m) => m.delete());
+  return result;
+}
+
 /**
  * The printable bin. In floor mode the floor is made thicker by the pocket depth
  * and the pockets are cut into it, so bases sit at the same height in both modes.
+ * A lid with snap clips needs grooves in the wall for the clips to catch in.
  */
 export function buildBinPart(wasm, project, plan) {
   const { bin, layout, preview } = project;
   const floorMode = layout.pocketMode === 'floor';
-  const shell = buildGridfinityBin(wasm, {
+  const shell = cutSnapGrooves(wasm, buildGridfinityBin(wasm, {
     unitsX: plan.unitsX,
     unitsY: plan.unitsY,
     heightMm: plan.heightMm,
@@ -42,7 +51,7 @@ export function buildBinPart(wasm, project, plan) {
     lip: bin.lip,
     feet: bin.feet,
     segments: preview.segments,
-  });
+  }), plan);
   if (!floorMode) return shell;
   const pockets = pocketSection(wasm, project, plan, preview.segments * 2);
   const result = cutPockets(wasm, shell, pockets, plan.floorZ, layout.pocketDepth);

@@ -1,3 +1,5 @@
+import { DEFAULT_WALL } from '../geometry/gridfinity';
+
 /**
  * The project is the single source of truth: what the user wants to store and
  * how the bin should be built. Everything else (bin size, layout, warnings) is
@@ -19,6 +21,10 @@ export const BASE_PRESETS = {
 
 // Picked to stay distinct on the dark drafting background, also in lightness.
 export const GROUP_COLORS = ['#6fd3ff', '#ffc861', '#c9a7f5', '#7bd88f', '#ff8a80', '#4fd1c5', '#f48fb1', '#e6ee9c'];
+
+// Stored projects and collections carry this, so old settings can be upgraded on load.
+export const PROJECT_VERSION = 2;
+const OLD_DEFAULT_WALL = 0.95;
 
 export const POCKET_MODES = ['inlay', 'floor'];
 
@@ -44,7 +50,7 @@ export const DEFAULT_BIN = {
   heightUnits: 6,
   lip: true,
   feet: true,
-  wall: 0.95,
+  wall: DEFAULT_WALL,
   floor: 1.2,
   maxUnits: 5, // 210 mm, fits most printer beds
   lid: 'none', // 'none' | 'flat' | 'stackable'; needs the stacking lip
@@ -78,7 +84,7 @@ export function makeGroup(index = 0, overrides = {}) {
 
 export function makeDefaultProject() {
   return {
-    version: 1,
+    version: PROJECT_VERSION,
     name: 'My miniatures',
     groups: [makeGroup(0, { name: 'Infantry' })],
     bin: { ...DEFAULT_BIN },
@@ -113,6 +119,16 @@ export function normalizeGroup(g, index) {
   };
 }
 
+/**
+ * Bin settings from before version 2 that still carry the old default wall (Gridfinity's
+ * thin 0.95 mm, which printed too weak for carrying miniatures) get the new default.
+ */
+export function normalizeBin(given, version) {
+  const bin = normalizeSettings(DEFAULT_BIN, given);
+  if (!(version >= 2) && bin.wall === OLD_DEFAULT_WALL) bin.wall = DEFAULT_BIN.wall;
+  return bin;
+}
+
 /** Takes known settings from `given`, falling back to `defaults` for anything missing or invalid. */
 export function normalizeSettings(defaults, given) {
   return Object.fromEntries(Object.entries(defaults).map(([k, v]) => {
@@ -133,10 +149,10 @@ export function normalizeProject(raw) {
     ? raw.groups.filter(isObject).slice(0, 24).map(normalizeGroup)
     : base.groups;
   return {
-    version: 1,
+    version: PROJECT_VERSION,
     name: typeof raw.name === 'string' ? raw.name.slice(0, 80) : base.name,
     groups,
-    bin: normalizeSettings(DEFAULT_BIN, raw.bin),
+    bin: normalizeBin(raw.bin, raw.version),
     layout: normalizeSettings(DEFAULT_LAYOUT, raw.layout),
     preview: normalizeSettings(DEFAULT_PREVIEW, raw.preview),
   };

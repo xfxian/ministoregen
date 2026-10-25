@@ -2,6 +2,7 @@ import { ExpandMore } from '@mui/icons-material';
 import {
   Accordion, AccordionDetails, AccordionSummary, Grid2 as Grid, MenuItem, TextField, Typography,
 } from '@mui/material';
+import { maxWall } from '../geometry/gridfinity';
 import { patchBin, patchLayout, patchPreview } from '../state/updates';
 import Stepper from './Stepper';
 
@@ -18,7 +19,7 @@ function AdvancedSettings({ project, onUpdate }) {
       <AccordionDetails sx={{ px: 0 }}>
         <Typography variant="overline" color="text.secondary">Bin</Typography>
         <Grid container spacing={1.5} sx={{ mb: 2 }}>
-          {field('Wall', bin.wall, (v) => onUpdate(patchBin({ wall: Math.max(0.4, v) })), { helperText: 'Gridfinity default 0.95' })}
+          {field('Wall', bin.wall, (v) => onUpdate(patchBin({ wall: Math.min(maxWall(bin), Math.max(0.4, v)) })), { helperText: bin.lip ? '2.6 = flush with the lip' : 'Gridfinity thin wall 0.95' })}
           {field('Floor', bin.floor, (v) => onUpdate(patchBin({ floor: Math.max(0.4, v) })), { helperText: 'Above the feet' })}
           {field('Largest bin', bin.maxUnits, (v) => onUpdate(patchBin({ maxUnits: Math.min(12, Math.max(1, Math.round(v))) })), { unit: 'u', step: 1, helperText: 'Printer bed limit' })}
         </Grid>

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { HEIGHT_UNIT, throatSize } from '../geometry/gridfinity';
+import { DEFAULT_WALL, HEIGHT_UNIT, throatSize } from '../geometry/gridfinity';
 import { LID_SNAP_DROP } from '../geometry/lid';
 import { STACKED_FOOT_DROP, layoutStrip, minStripLength, planProject } from './layout';
 import { DEFAULT_LAYOUT, decodeProject, encodeProject, makeDefaultProject, makeGroup, normalizeProject } from './project';
@@ -126,14 +126,39 @@ describe('lids', () => {
 });
 
 describe('pocket modes', () => {
-  it('fits more pockets in the bin floor than in a drop-in inlay of the same bin', () => {
+  it('gives floor pockets the whole cavity, which is the lip opening with the default wall', () => {
     const groups = [makeGroup(0, { sizeX: 25, sizeY: 25, count: 1 })];
     const fixed = { autoFootprint: false, unitsX: 2, unitsY: 3 };
+    const inlayPlan = planProject(project(groups, fixed));
+    const floorPlan = planProject({ ...project(groups, fixed), layout: { ...layout, pocketMode: 'floor' } });
+    expect(floorPlan.area.width).toBeCloseTo(throatSize(2), 6);
+    expect(inlayPlan.area.width).toBeCloseTo(throatSize(2) - layout.inlayClearance, 6);
+  });
+
+  it('fits more pockets in the bin floor than in a drop-in inlay of a thin-walled bin', () => {
+    const groups = [makeGroup(0, { sizeX: 25, sizeY: 25, count: 1 })];
+    const fixed = { autoFootprint: false, unitsX: 2, unitsY: 3, wall: 0.95 };
     const inlayPlan = planProject(project(groups, fixed));
     const floorPlan = planProject({ ...project(groups, fixed), layout: { ...layout, pocketMode: 'floor' } });
     expect(floorPlan.inlay).toBeNull();
     expect(floorPlan.area.width).toBeGreaterThan(inlayPlan.area.width);
     expect(floorPlan.strips[0].capacity).toBeGreaterThan(inlayPlan.strips[0].capacity);
+  });
+});
+
+describe('stored projects', () => {
+  it('upgrades the old thin default wall, but keeps walls someone chose', () => {
+    expect(normalizeProject({ version: 1, bin: { wall: 0.95 } }).bin.wall).toBe(DEFAULT_WALL);
+    expect(normalizeProject({ bin: { wall: 0.95 } }).bin.wall).toBe(DEFAULT_WALL);
+    expect(normalizeProject({ version: 1, bin: { wall: 1.2 } }).bin.wall).toBe(1.2);
+    expect(normalizeProject({ version: 2, bin: { wall: 0.95 } }).bin.wall).toBe(0.95);
+  });
+
+  it('never builds a wall thicker than the lip is deep', () => {
+    const groups = [makeGroup(0, { sizeX: 25, sizeY: 25, count: 1 })];
+    const fixed = { autoFootprint: false, unitsX: 2, unitsY: 2 };
+    const thick = planProject({ ...project(groups, { ...fixed, wall: 5 }), layout: { ...layout, pocketMode: 'floor' } });
+    expect(thick.area.width).toBeCloseTo(throatSize(2), 6);
   });
 });
 

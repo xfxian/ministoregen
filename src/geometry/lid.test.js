@@ -3,7 +3,7 @@ import Module from 'manifold-3d';
 import { beforeAll, describe, expect, it } from 'vitest';
 import { manifoldToStl } from '../export';
 import { buildGridfinityBin, outerSize } from './gridfinity';
-import { LID_SEAT_DROP, LID_SNAP_DROP, buildLid, lidHeight } from './lid';
+import { LID_SEAT_DROP, LID_SNAP_DROP, buildLid, buildSnapGrooves, lidHeight } from './lid';
 import { inspectStl } from './meshCheck';
 
 let wasm;
@@ -13,7 +13,15 @@ beforeAll(async () => {
 });
 
 const H = 21;
-const bin = (opts = {}) => buildGridfinityBin(wasm, { unitsX: 2, unitsY: 1, heightMm: H, segments: 24, ...opts });
+// A bin as the app builds it for a lid: with grooves in the wall when the lid has snap clips.
+function bin({ snap = false, ...opts } = {}) {
+  const shell = buildGridfinityBin(wasm, { unitsX: 2, unitsY: 1, heightMm: H, segments: 24, ...opts });
+  if (!snap) return shell;
+  const grooves = buildSnapGrooves(wasm, { unitsX: 2, unitsY: 1, heightMm: H });
+  const result = shell.subtract(grooves);
+  [shell, grooves].forEach((m) => m.delete());
+  return result;
+}
 const lid = (opts) => buildLid(wasm, { unitsX: 2, unitsY: 1, segments: 24, ...opts });
 
 function overlap(a, b) {
@@ -46,8 +54,12 @@ describe('lids', () => {
     }
   });
 
-  it.each(VARIANTS)('seats in the lip without touching the bin and cannot slide: %o', (opts) => {
-    const b = bin();
+  it.each([
+    ...VARIANTS.map((v) => ({ ...v, wall: 2.6 })),
+    { style: 'flat', snap: true, wall: 0.95 },
+    { style: 'flat', snap: true, wall: 1.9 },
+  ])('seats in the lip without touching the bin and cannot slide: %o', ({ wall, ...opts }) => {
+    const b = bin({ wall, snap: opts.snap });
     const l = lid(opts);
     const seat = H - (opts.snap ? LID_SNAP_DROP : LID_SEAT_DROP);
     const seated = l.translate(0, 0, seat + 0.02);
@@ -59,19 +71,34 @@ describe('lids', () => {
     [b, l, seated, tooLow, shifted].forEach((m) => m.delete());
   });
 
-  it('snap clips catch under the lip support when the lid is pulled up', () => {
+  it.each([2.6, 1.9, 0.95])('snap clips catch when the lid is pulled up (wall %s)', (wall) => {
     for (const style of ['flat', 'stackable']) {
-      const b = bin();
+      const b = bin({ wall, snap: true });
       const plain = lid({ style, snap: false });
       const clipped = lid({ style, snap: true });
       const lifted = (m, drop) => m.translate(0, 0, H - drop + 0.4);
       const a = lifted(plain, LID_SEAT_DROP);
       const c = lifted(clipped, LID_SNAP_DROP);
-      // Without clips a lid lifts freely; with clips the barbs run into the support.
+      // Without clips a lid lifts freely; with clips the barbs run into the groove roof
+      // (or the lip support of a thin wall).
       expect(overlap(b, a)).toBeLessThan(1e-3);
       expect(overlap(b, c)).toBeGreaterThan(0.05);
       [b, plain, clipped, a, c].forEach((m) => m.delete());
     }
+  });
+
+  it('snap clips are springs that hang free of the lid except at their root', () => {
+    const plain = lid({ style: 'flat', snap: false });
+    const clipped = lid({ style: 'flat', snap: true });
+    // A thin probe in the slot behind each beam finds no material: the beam can flex inwards.
+    // The +X beam runs from its root at y = -13.5 to its free end at y = 2.5.
+    const probe = wasm.Manifold.cube([0.3, 12, 2.5]).translate(outerSize(2) / 2 - 4.95, -9, 0.2);
+    expect(overlap(clipped, probe)).toBeLessThan(1e-6);
+    expect(overlap(plain, probe)).toBeGreaterThan(1);
+    // A gap above the beam separates it from the lid body.
+    const roof = wasm.Manifold.cube([1, 12, 0.6]).translate(outerSize(2) / 2 - 4, -9, 3.1);
+    expect(overlap(clipped, roof)).toBeLessThan(1e-6);
+    [plain, clipped, probe, roof].forEach((m) => m.delete());
   });
 
   it.each([false, true])('takes a bin on top of a stackable lid (snap %s)', (snap) => {
