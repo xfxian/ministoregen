@@ -12,12 +12,14 @@ export const STACKED_FOOT_DROP = FOOT_HEIGHT - LIP_HEIGHT;
 
 /** The same group with its base turned by 90° (counter-clockwise, like placeOutline). */
 function turned(group) {
-  return { ...group, sizeX: group.sizeY, sizeY: group.sizeX, overhang: turnOverhang(normalizeOverhang(group.overhang)) };
+  return {
+    ...group, sizeX: group.sizeY, sizeY: group.sizeX, overhang: turnOverhang(normalizeOverhang(group.overhang)), notchTurned: !group.notchTurned,
+  };
 }
 
-/** Orientations worth trying: a round or square base reaching equally far on every side looks the same either way. */
+/** Orientations worth trying: a round or square base reaching equally far on every side, without notches, looks the same either way. */
 function orientations(group) {
-  return group.sizeX === group.sizeY && evenOverhang(normalizeOverhang(group.overhang)) ? [false] : [false, true];
+  return group.sizeX === group.sizeY && evenOverhang(normalizeOverhang(group.overhang)) && !group.notches ? [false] : [false, true];
 }
 
 const oriented = (group, rotated) => (rotated ? turned(group) : group);
@@ -205,6 +207,11 @@ function packInto(groups, layout, width, length) {
   return { fits: packed.fits, positions: placePockets(groups, layout, packed, width, length) };
 }
 
+/** How deep a model's pocket is: its own depth, or the bin's (floor pocket depth or inlay thickness). */
+export function pocketDepthOf(group, layout) {
+  return group.pocketDepth ?? (layout.pocketMode === 'floor' ? layout.pocketDepth : layout.inlayDepth);
+}
+
 /** The wall the shell actually builds: never thicker than the lip is deep. */
 function wallOf(bin) {
   return Math.min(bin.wall, maxWall(bin));
@@ -311,15 +318,24 @@ export function planProject(project) {
     });
   }
 
+  // The floor pockets are cut into, or the inlay, is as thick as the deepest pocket.
+  // Shallower pockets stop short of its bottom, so their models stand higher.
+  const pocketDepth = groups.reduce((m, g) => Math.max(m, pocketDepthOf(g, layout)), pocketDepthOf({}, layout));
   const area = { width: areaSize(unitsX, bin, layout), length: areaSize(unitsY, bin, layout) };
   const inlay = layout.pocketMode === 'inlay'
-    ? { ...area, depth: layout.inlayDepth, cornerRadius: layout.inlayCornerRadius }
+    ? { ...area, depth: pocketDepth, cornerRadius: layout.inlayCornerRadius }
     : null;
   const usableW = area.width - 2 * layout.margin;
   const usableL = area.length - 2 * layout.margin;
 
+  const floorZ = cavityBottom({ feet: bin.feet, floor: bin.floor });
   const placements = packInto(groups, layout, usableW, usableL).positions;
-  const strips = groups.map((group, i) => ({ group, positions: placements[i], capacity: placements[i].length }));
+  const strips = groups.map((group, i) => {
+    const depth = pocketDepthOf(group, layout);
+    // The model stands on its pocket bottom (a model without a base, on its touchpoints).
+    const seatZ = floorZ + pocketDepth - depth;
+    return { group, positions: placements[i], capacity: placements[i].length, depth, seatZ };
+  });
 
   strips.forEach(({ group, capacity }) => {
     const fitsAtAll = orientations(group).some((r) => fitCount(oriented(group, r), layout, usableW, usableL) > 0);
@@ -342,7 +358,6 @@ export function planProject(project) {
     }
   });
 
-  const floorZ = cavityBottom({ feet: bin.feet, floor: bin.floor });
   const lid = bin.lip && bin.lid !== 'none' ? { style: bin.lid, snap: bin.lidSnap } : null;
   if (lid) lid.height = lidHeight(lid);
   if (!bin.lip && bin.lid !== 'none') {
@@ -355,15 +370,15 @@ export function planProject(project) {
   }
   // Whatever sits in the lip on top (a stacked bin, a lid, or a lid's snap clips) reaches this far down.
   const drop = !bin.lip ? 0 : lid?.snap ? LID_SNAP_DROP : STACKED_FOOT_DROP;
-  const tallest = groups.reduce((m, g) => Math.max(m, g.heightMm), 0);
+  const topZ = strips.reduce((m, s) => Math.max(m, s.seatZ + s.group.heightMm), floorZ);
   const minHeight = minBodyHeight({ feet: bin.feet, floor: bin.floor, wall: wallOf(bin), lip: bin.lip });
-  const neededHeight = Math.max(floorZ + tallest + drop, minHeight);
+  const neededHeight = Math.max(topZ + drop, minHeight);
   const neededUnits = Math.ceil(neededHeight / HEIGHT_UNIT - 1e-9);
   const heightUnits = bin.autoHeight ? neededUnits : bin.heightUnits;
   const heightMm = Math.max(heightUnits * HEIGHT_UNIT, minHeight);
 
-  groups.forEach((g) => {
-    const over = floorZ + g.heightMm + drop - heightMm;
+  strips.forEach(({ group: g, seatZ }) => {
+    const over = seatZ + g.heightMm + drop - heightMm;
     if (over > 1e-6) {
       warnings.push({
         id: `tall-${g.id}`,
@@ -375,5 +390,7 @@ export function planProject(project) {
     }
   });
 
-  return { unitsX, unitsY, heightUnits, heightMm, area, inlay, lid, strips, warnings, floorZ };
+  return {
+    unitsX, unitsY, heightUnits, heightMm, area, inlay, lid, strips, warnings, floorZ, pocketDepth,
+  };
 }

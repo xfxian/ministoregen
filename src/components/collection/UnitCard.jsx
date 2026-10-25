@@ -4,7 +4,7 @@ import { SIDES, evenOverhang, hasOverhang, normalizeOverhang } from '../../model
 import { tokens } from '../../theme';
 import BaseSketch, { baseLabel } from './BaseSketch';
 
-const SHAPE_WORDS = { round: 'round', oval: 'oval', square: 'square', rect: 'rectangular' };
+const SHAPE_WORDS = { round: 'round', oval: 'oval', square: 'square', rect: 'rectangular', pads: 'no base' };
 
 function placementText(collection, unit) {
   const placed = unitPlacement(collection, unit.id);
@@ -24,8 +24,15 @@ function overhangText(model) {
   return ` · overhang ${SIDES.filter((s) => o[s] > 0).map((s) => `${s} ${o[s]}`).join(', ')} mm`;
 }
 
+function pocketText(model) {
+  return `${model.pocketDepth !== null && model.pocketDepth !== undefined ? ` · ${model.pocketDepth} mm deep` : ''}${model.notches ? ' · notches' : ''}`;
+}
+
 function modelText(model) {
-  return `${baseLabel(model)} ${SHAPE_WORDS[model.shape]} · ${model.heightMm} mm tall${overhangText(model)}`;
+  const base = model.shape === 'pads'
+    ? `${baseLabel(model)} no base, ${model.pads.length} touchpoints`
+    : `${baseLabel(model)} ${SHAPE_WORDS[model.shape]}`;
+  return `${base} · ${model.heightMm} mm tall${overhangText(model)}${pocketText(model)}`;
 }
 
 /** One unit of the collection as a card, with a sketch per model; opens the editor when clicked. */

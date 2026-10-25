@@ -1,4 +1,5 @@
 import { DEFAULT_WALL } from '../geometry/gridfinity';
+import { PAD_LAYOUTS, clampPad, padLayout } from './pockets';
 import { NO_OVERHANG, normalizeOverhang } from './reach';
 
 /**
@@ -7,7 +8,8 @@ import { NO_OVERHANG, normalizeOverhang } from './reach';
  * derived from it by planProject().
  */
 
-export const BASE_SHAPES = ['round', 'oval', 'square', 'rect'];
+// 'pads': no base; the model stands on touchpoints (tracks, landing gear) inside its footprint.
+export const BASE_SHAPES = ['round', 'oval', 'square', 'rect', 'pads'];
 
 export const BASE_PRESETS = {
   round: [25, 28.5, 32, 40, 50, 60, 80, 100].map((d) => ({ label: `${d} mm`, sizeX: d, sizeY: d })),
@@ -18,7 +20,12 @@ export const BASE_PRESETS = {
   rect: [
     [25, 50], [50, 75], [50, 100],
   ].map(([x, y]) => ({ label: `${x} × ${y} mm`, sizeX: x, sizeY: y })),
+  pads: [],
 };
+
+/** Deepest pocket a model can ask for. */
+export const MAX_POCKET_DEPTH = 40;
+export const MIN_POCKET_DEPTH = 0.4;
 
 // Picked to stay distinct on the dark drafting background, also in lightness.
 export const GROUP_COLORS = ['#6fd3ff', '#ffc861', '#c9a7f5', '#7bd88f', '#ff8a80', '#4fd1c5', '#f48fb1', '#e6ee9c'];
@@ -80,6 +87,9 @@ export function makeGroup(index = 0, overrides = {}) {
     count: 10,
     heightMm: 30,
     overhang: { ...NO_OVERHANG }, // how far the model reaches past its base: front, right, back, left
+    pocketDepth: null, // own pocket depth in mm; null uses the bin's
+    notches: false, // finger notches to lift the model out
+    pads: [], // touchpoints of a model without a base (shape 'pads'), centred on its footprint
     color: GROUP_COLORS[index % GROUP_COLORS.length],
     ...overrides,
   };
@@ -110,18 +120,31 @@ const num = (v, fallback, min = -Infinity, max = Infinity) =>
 export function normalizeGroup(g, index) {
   const d = makeGroup(index);
   if (!isObject(g)) return d;
+  const sizeX = num(g.sizeX, d.sizeX, 5, 200);
+  const sizeY = num(g.sizeY, d.sizeY, 5, 200);
   return {
     id: typeof g.id === 'string' ? g.id : d.id,
     name: typeof g.name === 'string' ? g.name.slice(0, 60) : d.name,
     shape: BASE_SHAPES.includes(g.shape) ? g.shape : d.shape,
-    sizeX: num(g.sizeX, d.sizeX, 5, 200),
-    sizeY: num(g.sizeY, d.sizeY, 5, 200),
+    sizeX,
+    sizeY,
     count: Math.round(num(g.count, d.count, 1, 500)),
     heightMm: num(g.heightMm, d.heightMm, 1, 300),
     // A single number, stored before version 3, applies to every side.
     overhang: normalizeOverhang(g.overhang),
+    pocketDepth: typeof g.pocketDepth === 'number' && Number.isFinite(g.pocketDepth)
+      ? Math.min(MAX_POCKET_DEPTH, Math.max(MIN_POCKET_DEPTH, g.pocketDepth)) : null,
+    notches: g.notches === true,
+    pads: normalizePads(g, sizeX, sizeY),
     color: typeof g.color === 'string' && /^#[0-9a-f]{6}$/i.test(g.color) ? g.color : d.color,
   };
+}
+
+/** Touchpoints kept inside the footprint; a model without a base always has some. */
+function normalizePads(g, sizeX, sizeY) {
+  const valid = (p) => isObject(p) && ['x', 'y', 'sizeX', 'sizeY'].every((k) => typeof p[k] === 'number' && Number.isFinite(p[k]));
+  const pads = Array.isArray(g.pads) ? g.pads.filter(valid).slice(0, 12).map((p) => clampPad(p, sizeX, sizeY)) : [];
+  return g.shape === 'pads' && !pads.length ? padLayout(PAD_LAYOUTS[0], sizeX, sizeY) : pads;
 }
 
 /**

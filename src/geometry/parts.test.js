@@ -45,3 +45,40 @@ describe('printable parts', () => {
     inlay.delete();
   });
 });
+
+describe('vehicle pockets', () => {
+  function vehicles(pocketMode) {
+    const p = makeDefaultProject();
+    p.preview.segments = 16;
+    p.layout.pocketMode = pocketMode;
+    p.groups = [
+      makeGroup(0, {
+        shape: 'pads', sizeX: 60, sizeY: 90, count: 1, heightMm: 50, pocketDepth: 8,
+        pads: [{ x: 0, y: 35, sizeX: 10, sizeY: 10, shape: 'round' }, { x: -20, y: -35, sizeX: 10, sizeY: 10, shape: 'round' }, { x: 20, y: -35, sizeX: 10, sizeY: 10, shape: 'rect' }],
+      }),
+      makeGroup(1, { count: 2, notches: true }),
+    ];
+    return p;
+  }
+
+  it('cuts touchpoints through a thick inlay and stops shallower pockets short of its bottom', () => {
+    const p = vehicles('inlay');
+    const plan = planProject(p);
+    const inlay = buildInlayPart(wasm, p, plan);
+    expect(inlay.status()).toBe('NoError');
+    // Only the three 8 mm touchpoints go through; the 3 mm pockets are blind.
+    expect(inlay.genus()).toBe(3);
+    const { min, max } = inlay.boundingBox();
+    expect(max[2] - min[2]).toBeCloseTo(8, 3);
+    inlay.delete();
+  });
+
+  it('cuts touchpoints, notches and pockets of different depths into one watertight bin', () => {
+    const p = vehicles('floor');
+    const plan = planProject(p);
+    const bin = buildBinPart(wasm, p, plan);
+    expect(bin.status()).toBe('NoError');
+    expect(bin.genus()).toBe(0);
+    bin.delete();
+  });
+});

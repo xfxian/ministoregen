@@ -28,7 +28,7 @@ export const SORT_MODES = ['units', 'size', 'fill'];
 let nextId = 1;
 const newId = (prefix) => `${prefix}${Date.now().toString(36)}${(nextId++).toString(36)}`;
 
-const MODEL_FIELDS = ['shape', 'sizeX', 'sizeY', 'count', 'heightMm', 'overhang', 'color'];
+const MODEL_FIELDS = ['shape', 'sizeX', 'sizeY', 'count', 'heightMm', 'overhang', 'pocketDepth', 'notches', 'pads', 'color'];
 
 export function makeModel(index = 0, overrides = {}) {
   return makeGroup(index, { name: '', count: 1, ...overrides, id: overrides.id ?? newId('m') });

@@ -218,7 +218,7 @@ const memo = new Map();
  */
 export function nestGroups(groups, layout, width, length) {
   const wide = width > length;
-  const key = JSON.stringify([groups.map((g) => [g.shape, g.sizeX, g.sizeY, g.overhang, g.count]),
+  const key = JSON.stringify([groups.map((g) => [g.shape, g.sizeX, g.sizeY, g.overhang, Boolean(g.notches), g.count]),
     layout.baseClearance, layout.spacing, layout.curvature, Math.min(width, length), Math.max(width, length)]);
   if (!memo.has(key)) {
     if (memo.size > 500) memo.clear();
