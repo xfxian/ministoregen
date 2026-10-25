@@ -1,4 +1,5 @@
 import { DEFAULT_WALL } from '../geometry/gridfinity';
+import { NO_OVERHANG, normalizeOverhang } from './reach';
 
 /**
  * The project is the single source of truth: what the user wants to store and
@@ -23,7 +24,8 @@ export const BASE_PRESETS = {
 export const GROUP_COLORS = ['#6fd3ff', '#ffc861', '#c9a7f5', '#7bd88f', '#ff8a80', '#4fd1c5', '#f48fb1', '#e6ee9c'];
 
 // Stored projects and collections carry this, so old settings can be upgraded on load.
-export const PROJECT_VERSION = 2;
+// 2: thicker default wall (see normalizeBin); 3: overhang per side instead of one number.
+export const PROJECT_VERSION = 3;
 const OLD_DEFAULT_WALL = 0.95;
 
 export const POCKET_MODES = ['inlay', 'floor'];
@@ -77,7 +79,7 @@ export function makeGroup(index = 0, overrides = {}) {
     sizeY: 32,
     count: 10,
     heightMm: 30,
-    overhang: 0, // how far the model reaches past its base on each side
+    overhang: { ...NO_OVERHANG }, // how far the model reaches past its base: front, right, back, left
     color: GROUP_COLORS[index % GROUP_COLORS.length],
     ...overrides,
   };
@@ -116,7 +118,8 @@ export function normalizeGroup(g, index) {
     sizeY: num(g.sizeY, d.sizeY, 5, 200),
     count: Math.round(num(g.count, d.count, 1, 500)),
     heightMm: num(g.heightMm, d.heightMm, 1, 300),
-    overhang: num(g.overhang, d.overhang, 0, 100),
+    // A single number, stored before version 3, applies to every side.
+    overhang: normalizeOverhang(g.overhang),
     color: typeof g.color === 'string' && /^#[0-9a-f]{6}$/i.test(g.color) ? g.color : d.color,
   };
 }

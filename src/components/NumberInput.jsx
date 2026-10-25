@@ -75,7 +75,14 @@ function NumberInput({
           notched
           inputProps={{ style: { textAlign: 'center', MozAppearance: 'textfield' }, type: 'number' }}
           disabled={disabled}
-          sx={{ flexGrow: 1, '& input::-webkit-outer-spin-button, & input::-webkit-inner-spin-button': { display: 'none' } }}
+          sx={{
+            flexGrow: 1,
+            // Narrow fields (two side by side on a phone) still need room for the digits.
+            '& input': { px: 0.5, minWidth: '2.5ch' },
+            '& .MuiInputAdornment-positionEnd': { ml: 0 },
+            '&.MuiInputBase-adornedEnd': { pr: 1 },
+            '& input::-webkit-outer-spin-button, & input::-webkit-inner-spin-button': { display: 'none' },
+          }}
         />
         <IconButton size="small" onClick={() => emit(parseFloat(value) + step)} disabled={disabled}>
           <Add fontSize="small" />

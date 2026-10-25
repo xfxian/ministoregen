@@ -1,5 +1,6 @@
 import { GRID_PITCH, LIP_DEPTH, OUTER_RADIUS, outerSize } from '../geometry/gridfinity';
 import { placeOutline, pocketOutline } from '../model/pockets';
+import { hasOverhang, normalizeOverhang, reachOutline } from '../model/reach';
 import { tokens } from '../theme';
 
 const fmt = (mm) => (Math.round(mm * 10) / 10).toString();
@@ -8,9 +9,6 @@ function outlinePath(points) {
   // Model Y points up; SVG Y points down.
   return `M${points.map(([px, py]) => `${px.toFixed(2)},${(-py).toFixed(2)}`).join('L')}Z`;
 }
-
-/** The group as wide as the model reaches, for drawing its overhang. */
-const grown = (g) => ({ ...g, sizeX: g.sizeX + 2 * g.overhang, sizeY: g.sizeY + 2 * g.overhang });
 
 function roundedRect(w, h, r, props) {
   return <rect x={-w / 2} y={-h / 2} width={w} height={h} rx={Math.max(0, r)} {...props} />;
@@ -57,7 +55,7 @@ function PlanDrawing({ project, plan, detailed = false, highlightId = null, labe
       </g>
       {plan.strips.map(({ group, positions }) => {
         const outline = pocketOutline(group, project.layout, 32);
-        const reach = group.overhang > 0 ? pocketOutline(grown(group), project.layout, 32) : null;
+        const reach = hasOverhang(normalizeOverhang(group.overhang)) ? reachOutline(group, project.layout, 32) : null;
         const dim = highlightId && highlightId !== group.id;
         return (
           <g key={group.id} opacity={dim ? 0.3 : 1}>
@@ -65,11 +63,12 @@ function PlanDrawing({ project, plan, detailed = false, highlightId = null, labe
               <path
                 key={`reach${position[0]},${position[1]}`}
                 d={outlinePath(placeOutline(reach, position))}
-                style={stroke}
+                style={{ ...stroke, fill: group.color }}
+                fillOpacity={0.06}
                 stroke={group.color}
-                strokeOpacity={0.4}
+                strokeOpacity={0.6}
                 strokeWidth={1}
-                strokeDasharray="1 3"
+                strokeDasharray="2 3"
               />
             ))}
             {positions.map((position, i) => {

@@ -6,6 +6,7 @@ import { buildBinPart, buildInlayPart, buildLidPart } from '../geometry/parts';
 import { STACKED_FOOT_DROP } from '../model/layout';
 import { toBufferGeometry } from '../geometry/toBufferGeometry';
 import { placeOutline, pocketOutline } from '../model/pockets';
+import { hasOverhang, normalizeOverhang, reachOutline } from '../model/reach';
 
 // Keeps the left half of the model when the cut view is on, exposing the wall profile.
 const CUT_PLANE = new THREE.Plane(new THREE.Vector3(-1, 0, 0), 0);
@@ -65,23 +66,39 @@ function PocketMarkers({ project, plan, highlightId, cut }) {
   ));
 }
 
-/** Translucent stand-ins for the miniatures, to check heights against the bin. */
-function MiniGhosts({ plan, highlightId, cut }) {
+/**
+ * A stand-in for one model, centred on its base: the base shape up to its full height,
+ * and for a model that reaches past its base, that reach over its upper half.
+ */
+function ghostGeometry(group, layout) {
+  const { sizeX, sizeY, heightMm, shape } = group;
+  const base = (shape === 'square' || shape === 'rect'
+    ? new THREE.BoxGeometry(sizeX * 0.9, sizeY * 0.9, heightMm)
+    : new THREE.CylinderGeometry(0.45, 0.45, heightMm, 24).rotateX(Math.PI / 2).scale(sizeX, sizeY, 1)
+  ).translate(0, 0, heightMm / 2);
+  if (!hasOverhang(normalizeOverhang(group.overhang))) return base;
+  const outline = reachOutline(group, layout, 32).map(([x, y]) => new THREE.Vector2(x, y));
+  const reach = new THREE.ExtrudeGeometry(new THREE.Shape(outline), { depth: heightMm / 2, bevelEnabled: false })
+    .translate(0, 0, heightMm / 2);
+  const parts = [base.toNonIndexed(), reach.toNonIndexed()];
+  parts.forEach((g) => g.deleteAttribute('uv'));
+  const merged = mergeGeometries(parts);
+  [base, reach, ...parts].forEach((g) => g.dispose());
+  return merged;
+}
+
+/** Translucent stand-ins for the miniatures, to check heights against the bin and see which way they face. */
+function MiniGhosts({ project, plan, highlightId, cut }) {
   const geometries = useMemo(() => plan.strips.map((s) => {
     const placed = s.positions.slice(0, s.group.count);
     if (!placed.length) return null;
-    const { sizeX, sizeY, heightMm, shape } = s.group;
-    const base = shape === 'square' || shape === 'rect'
-      ? new THREE.BoxGeometry(sizeX * 0.9, sizeY * 0.9, heightMm)
-      : new THREE.CylinderGeometry(0.45, 0.45, heightMm, 24).rotateX(Math.PI / 2).scale(sizeX, sizeY, 1);
-    const merged = mergeGeometries(placed.map(([x, y, rotated]) => {
-      const g = base.clone();
-      if (rotated) g.rotateZ(Math.PI / 2);
-      return g.translate(x, y, heightMm / 2);
-    }));
-    base.dispose();
+    const ghost = ghostGeometry(s.group, project.layout);
+    const merged = mergeGeometries(placed.map(([x, y, turns]) => ghost.clone()
+      .rotateZ(((Number(turns) || 0) * Math.PI) / 2)
+      .translate(x, y, 0)));
+    ghost.dispose();
     return { group: s.group, geometry: merged, dispose: () => merged.dispose() };
-  }).filter(Boolean), [plan]);
+  }).filter(Boolean), [plan, project.layout]);
   useEffect(() => () => geometries.forEach((g) => g.dispose()), [geometries]);
 
   return geometries.map(({ group, geometry }) => (
@@ -118,7 +135,7 @@ function Scene({ wasm, project, plan, view, highlightId }) {
         <Part geometry={lidGeometry} color="#c3cad3" opacity={1} wireframe={preview.wireframe} cut={cut} z={lidZ} />
       )}
       <PocketMarkers project={project} plan={plan} highlightId={highlightId} cut={cut} />
-      {preview.showMinis && <MiniGhosts plan={plan} highlightId={highlightId} cut={cut} />}
+      {preview.showMinis && <MiniGhosts project={project} plan={plan} highlightId={highlightId} cut={cut} />}
     </group>
   );
 }
