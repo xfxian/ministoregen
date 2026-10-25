@@ -10,7 +10,8 @@ Live at: https://xfxian.github.io/ministoregen
 - **Single bin**: skip the collection and design one bin from a list of miniature groups; the bin size, height and pocket layout follow
 - **Gridfinity bins** that stack: spec foot profile, stacking lip and 7 mm height units, built as one watertight solid
 - **Two pocket modes**: a drop-in inlay that passes through the stacking lip, or pockets cut straight into the bin floor
-- **Round, oval, square and rectangular bases** with game presets; staggered or straight packing, whichever fits more
+- **Round, oval, square and rectangular bases** with game presets; staggered or straight packing, bases turned where that fits more, and smaller bases filling the room next to large ones
+- **Lids**: flat, or stackable with a baseplate grid on top; optional snap clips keep either one on
 - **Fit check** with warnings and one-click fixes (too tall, does not fit, base wider than the bin)
 - **Plan, 3D and cut-away views**, with optional stand-ins for the miniatures
 - **Library** of saved designs in the browser; one backup file holds the designs and the collection

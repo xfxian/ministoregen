@@ -109,8 +109,10 @@ describe('exported meshes', () => {
       makeUnit(2, { shape: 'oval', sizeX: 42, sizeY: 75, count: 3, heightMm: 50 }),
     ]) c = addUnit(u)(c);
     c = distribute(c);
-    for (const item of c.cases) {
-      const p = caseProject(c, item);
+    for (const [n, item] of c.cases.entries()) {
+      const base = caseProject(c, item);
+      // Cover every lid variant across the cases.
+      const p = { ...base, bin: { ...base.bin, lid: ['flat', 'stackable'][n % 2], lidSnap: n % 3 !== 1 } };
       for (const file of buildPrintFiles(wasm, p, planProject(p), 'case')) {
         const report = inspectStl(file.data);
         expect(report.problems, file.name).toEqual([]);

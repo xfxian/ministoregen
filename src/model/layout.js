@@ -1,6 +1,7 @@
 import {
   FOOT_HEIGHT, HEIGHT_UNIT, LIP_HEIGHT, cavityBottom, minBodyHeight, outerSize, throatSize,
 } from '../geometry/gridfinity';
+import { LID_SNAP_DROP, lidHeight } from '../geometry/lid';
 
 /** When bins stack, the upper bin's feet reach this far below the lower bin's lip base. */
 export const STACKED_FOOT_DROP = FOOT_HEIGHT - LIP_HEIGHT;
@@ -294,7 +295,18 @@ export function planProject(project) {
   });
 
   const floorZ = cavityBottom({ feet: bin.feet, floor: bin.floor });
-  const drop = bin.lip ? STACKED_FOOT_DROP : 0;
+  const lid = bin.lip && bin.lid !== 'none' ? { style: bin.lid, snap: bin.lidSnap } : null;
+  if (lid) lid.height = lidHeight(lid);
+  if (!bin.lip && bin.lid !== 'none') {
+    warnings.push({
+      id: 'lid-needs-lip',
+      severity: 'warning',
+      text: 'Lids sit in the stacking lip, so this bin gets no lid.',
+      fix: { label: 'Add the stacking lip', bin: { lip: true } },
+    });
+  }
+  // Whatever sits in the lip on top (a stacked bin, a lid, or a lid's snap clips) reaches this far down.
+  const drop = !bin.lip ? 0 : lid?.snap ? LID_SNAP_DROP : STACKED_FOOT_DROP;
   const tallest = groups.reduce((m, g) => Math.max(m, g.heightMm), 0);
   const minHeight = minBodyHeight({ feet: bin.feet, floor: bin.floor, wall: bin.wall, lip: bin.lip });
   const neededHeight = Math.max(floorZ + tallest + drop, minHeight);
@@ -309,11 +321,11 @@ export function planProject(project) {
         id: `tall-${g.id}`,
         severity: 'warning',
         groupId: g.id,
-        text: `${g.name} is ${over.toFixed(1)} mm taller than the bin${bin.lip ? ' when bins are stacked' : ''}.`,
+        text: `${g.name} is ${over.toFixed(1)} mm taller than the bin${!bin.lip ? '' : lid ? ' with the lid on' : ' when bins are stacked'}.`,
         fix: { label: `Raise to ${neededUnits}u`, bin: { autoHeight: false, heightUnits: neededUnits } },
       });
     }
   });
 
-  return { unitsX, unitsY, heightUnits, heightMm, area, inlay, strips, warnings, floorZ };
+  return { unitsX, unitsY, heightUnits, heightMm, area, inlay, lid, strips, warnings, floorZ };
 }

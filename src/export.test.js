@@ -29,6 +29,15 @@ describe('export', () => {
     expect(files.map((f) => f.name)).toEqual(['tray-bin.stl', 'tray-inlay.stl']);
   });
 
+  it('adds the lid when the design has one', async () => {
+    const wasm = await loadManifoldForTests();
+    const project = makeDefaultProject();
+    project.bin.lid = 'stackable';
+    project.bin.lidSnap = true;
+    const files = buildPrintFiles(wasm, project, planProject(project), 'tray');
+    expect(files.map((f) => f.name)).toEqual(['tray-bin.stl', 'tray-inlay.stl', 'tray-lid.stl']);
+  });
+
   it('bundles files into a zip with a valid directory', async () => {
     const files = [
       { name: 'a.stl', data: new Uint8Array([1, 2, 3]) },

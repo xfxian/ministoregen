@@ -24,7 +24,7 @@ function Framing({ view, sizeKey }) {
 /** 3D preview of the printable parts; `view` is '3d' or 'cut' (cut-away along the length). */
 function Viewport({ project, plan, view, onUpdate, highlightId }) {
   const wasm = useManifold();
-  const sizeKey = `${plan.unitsX}x${plan.unitsY}x${plan.heightMm}`;
+  const sizeKey = `${plan.unitsX}x${plan.unitsY}x${plan.heightMm}x${plan.lid && project.preview.showLid ? plan.lid.style : ''}`;
 
   return (
     <Box sx={{ position: 'relative', width: '100%', height: '100%' }}>
@@ -43,11 +43,20 @@ function Viewport({ project, plan, view, onUpdate, highlightId }) {
         <OrbitControls makeDefault enableDamping={false} />
       </Canvas>
 
-      <FormControlLabel
-        control={<Switch size="small" checked={project.preview.showMinis} onChange={(e) => onUpdate(patchPreview({ showMinis: e.target.checked }))} />}
-        label={<Typography variant="body2">Show minis</Typography>}
-        sx={{ position: 'absolute', top: 10, right: 10, m: 0, pl: 1, pr: 1.5, borderRadius: 1, bgcolor: 'rgba(23,29,36,0.9)', border: `1px solid ${tokens.line}` }}
-      />
+      <Box sx={{ position: 'absolute', top: 10, right: 10, display: 'flex', flexDirection: 'column', alignItems: 'stretch', px: 1, py: 0.25, borderRadius: 1, bgcolor: 'rgba(23,29,36,0.9)', border: `1px solid ${tokens.line}` }}>
+        <FormControlLabel
+          control={<Switch size="small" checked={project.preview.showMinis} onChange={(e) => onUpdate(patchPreview({ showMinis: e.target.checked }))} />}
+          label={<Typography variant="body2">Show minis</Typography>}
+          sx={{ m: 0 }}
+        />
+        {plan.lid && (
+          <FormControlLabel
+            control={<Switch size="small" checked={project.preview.showLid} onChange={(e) => onUpdate(patchPreview({ showLid: e.target.checked }))} />}
+            label={<Typography variant="body2">Show lid</Typography>}
+            sx={{ m: 0 }}
+          />
+        )}
+      </Box>
 
       {!wasm && (
         <Box sx={{ position: 'absolute', inset: 0, display: 'grid', placeItems: 'center', pointerEvents: 'none' }}>

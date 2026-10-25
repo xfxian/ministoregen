@@ -1,5 +1,6 @@
 import { placeOutline, pocketOutline } from '../model/pockets';
 import { buildGridfinityBin } from './gridfinity';
+import { buildLid } from './lid';
 
 /** Union of all pocket outlines of a plan as one CrossSection, in bin coordinates. */
 function pocketSection(wasm, project, plan, segments) {
@@ -62,4 +63,16 @@ export function buildInlayPart(wasm, project, plan) {
   const result = cutPockets(wasm, plate, pockets, -0.01, depth);
   pockets?.delete();
   return result;
+}
+
+/** The lid, upright as it is printed, or null when the design has none. */
+export function buildLidPart(wasm, project, plan) {
+  if (!plan.lid) return null;
+  return buildLid(wasm, {
+    unitsX: plan.unitsX,
+    unitsY: plan.unitsY,
+    style: plan.lid.style,
+    snap: plan.lid.snap,
+    segments: project.preview.segments,
+  });
 }

@@ -1,4 +1,4 @@
-import { buildBinPart, buildInlayPart } from './geometry/parts';
+import { buildBinPart, buildInlayPart, buildLidPart } from './geometry/parts';
 
 // Exports are built at this smoothness or higher, whatever the preview uses.
 const EXPORT_SEGMENTS = 64;
@@ -42,7 +42,7 @@ export function manifoldToStl(manifold) {
   return new Uint8Array(buffer);
 }
 
-/** STL files for one design: the bin, and the inlay when the design uses one. */
+/** STL files for one design: the bin, plus the inlay and the lid when the design has them. */
 export function buildPrintFiles(wasm, project, plan, baseName = slugify(project.name)) {
   const exportProject = { ...project, preview: { ...project.preview, segments: Math.max(EXPORT_SEGMENTS, project.preview.segments) } };
   const files = [];
@@ -52,6 +52,7 @@ export function buildPrintFiles(wasm, project, plan, baseName = slugify(project.
   };
   add(`${baseName}-bin.stl`, buildBinPart(wasm, exportProject, plan));
   if (plan.inlay) add(`${baseName}-inlay.stl`, buildInlayPart(wasm, exportProject, plan));
+  if (plan.lid) add(`${baseName}-lid.stl`, buildLidPart(wasm, exportProject, plan));
   return files;
 }
 

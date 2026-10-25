@@ -22,6 +22,8 @@ export const GROUP_COLORS = ['#6fd3ff', '#ffc861', '#c9a7f5', '#7bd88f', '#ff8a8
 
 export const POCKET_MODES = ['inlay', 'floor'];
 
+export const LID_STYLES = ['none', 'flat', 'stackable'];
+
 export const DEFAULT_LAYOUT = {
   pocketMode: 'inlay', // 'inlay': separate drop-in part; 'floor': pockets cut into the bin floor
   pocketDepth: 3, // depth of floor pockets
@@ -45,12 +47,15 @@ export const DEFAULT_BIN = {
   wall: 0.95,
   floor: 1.2,
   maxUnits: 5, // 210 mm, fits most printer beds
+  lid: 'none', // 'none' | 'flat' | 'stackable'; needs the stacking lip
+  lidSnap: false, // snap clips that keep the lid on
 };
 
 export const DEFAULT_PREVIEW = {
   color: '#9aa4b1',
   wireframe: false,
   showMinis: true,
+  showLid: true,
   segments: 32,
 };
 
@@ -115,6 +120,7 @@ export function normalizeSettings(defaults, given) {
     if (typeof v === 'boolean') return [k, typeof g === 'boolean' ? g : v];
     if (typeof v === 'number') return [k, num(g, v, 0, 1000)];
     if (k === 'pocketMode') return [k, POCKET_MODES.includes(g) ? g : v];
+    if (k === 'lid') return [k, LID_STYLES.includes(g) ? g : v];
     return [k, typeof g === typeof v ? g : v];
   }));
 }
