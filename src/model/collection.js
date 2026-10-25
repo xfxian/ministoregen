@@ -6,7 +6,8 @@
  */
 import { planProject } from './layout';
 import {
-  DEFAULT_BIN, DEFAULT_LAYOUT, DEFAULT_PREVIEW, isObject, makeGroup, normalizeGroup, normalizeSettings,
+  DEFAULT_BIN, DEFAULT_LAYOUT, DEFAULT_PREVIEW, PROJECT_VERSION, isObject, makeGroup, normalizeBin, normalizeGroup,
+  normalizeSettings,
 } from './project';
 
 let nextId = 1;
@@ -34,7 +35,7 @@ export function makeCase(collection, overrides = {}) {
 }
 
 export function makeDefaultCollection() {
-  return { version: 1, name: 'My collection', units: [], cases: [], keepTogether: true, preview: { ...DEFAULT_PREVIEW } };
+  return { version: PROJECT_VERSION, name: 'My collection', units: [], cases: [], keepTogether: true, preview: { ...DEFAULT_PREVIEW } };
 }
 
 /** Repairs a stored or imported collection so it can never break the app. */
@@ -45,7 +46,7 @@ export function normalizeCollection(raw) {
   const cases = Array.isArray(raw.cases) ? raw.cases.filter(isObject).slice(0, 100).map((c, i) => ({
     id: typeof c.id === 'string' ? c.id : newId('c'),
     name: typeof c.name === 'string' ? c.name.slice(0, 60) : `Case ${i + 1}`,
-    bin: normalizeSettings(DEFAULT_BIN, c.bin),
+    bin: normalizeBin(c.bin, raw.version),
     layout: normalizeSettings(DEFAULT_LAYOUT, c.layout),
     items: Array.isArray(c.items) ? c.items.filter(isObject).map((item) => ({
       unitId: String(item.unitId),
@@ -53,7 +54,7 @@ export function normalizeCollection(raw) {
     })) : [],
   })) : [];
   return clampAssignments({
-    version: 1,
+    version: PROJECT_VERSION,
     name: typeof raw.name === 'string' ? raw.name.slice(0, 80) : base.name,
     units,
     cases,
@@ -84,7 +85,7 @@ export function caseProject(collection, c, preview = collection.preview ?? DEFAU
       return unit && i.count > 0 ? { ...unit, count: i.count } : null;
     })
     .filter(Boolean);
-  return { version: 1, name: c.name, groups, bin: c.bin, layout: c.layout, preview };
+  return { version: PROJECT_VERSION, name: c.name, groups, bin: c.bin, layout: c.layout, preview };
 }
 
 /**

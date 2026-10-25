@@ -1,5 +1,5 @@
 import {
-  FOOT_HEIGHT, HEIGHT_UNIT, LIP_HEIGHT, cavityBottom, minBodyHeight, outerSize, throatSize,
+  FOOT_HEIGHT, HEIGHT_UNIT, LIP_HEIGHT, cavityBottom, maxWall, minBodyHeight, outerSize, throatSize,
 } from '../geometry/gridfinity';
 import { LID_SNAP_DROP, lidHeight } from '../geometry/lid';
 
@@ -194,13 +194,18 @@ function placePockets(groups, layout, packed, width, length) {
   return groups.map((_, i) => [...real[i], ...spare[i]]);
 }
 
+/** The wall the shell actually builds: never thicker than the lip is deep. */
+function wallOf(bin) {
+  return Math.min(bin.wall, maxWall(bin));
+}
+
 /**
  * Size of the area pockets are laid out in, along one axis:
  * the drop-in inlay (which must pass the stacking lip opening), or the bin floor.
  */
 function areaSize(units, bin, layout) {
   return layout.pocketMode === 'floor'
-    ? outerSize(units) - 2 * bin.wall
+    ? outerSize(units) - 2 * wallOf(bin)
     : throatSize(units) - layout.inlayClearance;
 }
 
@@ -308,7 +313,7 @@ export function planProject(project) {
   // Whatever sits in the lip on top (a stacked bin, a lid, or a lid's snap clips) reaches this far down.
   const drop = !bin.lip ? 0 : lid?.snap ? LID_SNAP_DROP : STACKED_FOOT_DROP;
   const tallest = groups.reduce((m, g) => Math.max(m, g.heightMm), 0);
-  const minHeight = minBodyHeight({ feet: bin.feet, floor: bin.floor, wall: bin.wall, lip: bin.lip });
+  const minHeight = minBodyHeight({ feet: bin.feet, floor: bin.floor, wall: wallOf(bin), lip: bin.lip });
   const neededHeight = Math.max(floorZ + tallest + drop, minHeight);
   const neededUnits = Math.ceil(neededHeight / HEIGHT_UNIT - 1e-9);
   const heightUnits = bin.autoHeight ? neededUnits : bin.heightUnits;

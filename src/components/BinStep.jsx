@@ -87,7 +87,7 @@ function BinStep({ project, plan, onUpdate }) {
       </div>
       <Toggle
         label="Snap clips"
-        help={`Clips catch under the lip so the lid stays on until you pull it off. Needs ${LID_SNAP_DEPTH.toFixed(1)} mm more headroom.`}
+        help={`Spring clips catch in a groove in the bin wall, so the lid stays on until you pull it off. Needs ${LID_SNAP_DEPTH.toFixed(1)} mm more headroom.`}
         checked={bin.lidSnap}
         disabled={!bin.lip || bin.lid === 'none'}
         onChange={(v) => set({ lidSnap: v })}

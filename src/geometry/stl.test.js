@@ -78,7 +78,14 @@ describe('exported meshes', () => {
     const placed = inlay.translate(0, 0, plan.floorZ + 0.01);
     const overlap = bin.intersect(placed);
     expect(overlap.volume()).toBeLessThan(1e-3);
-    [bin, inlay, placed, overlap].forEach((m) => m.delete());
+    // The wall runs straight up into the lip, so the inlay cannot slide around in the bin.
+    const slid = [[0.35, 0], [0, 0.35]].map(([x, y]) => placed.translate(x, y, 0));
+    for (const m of slid) {
+      const hit = bin.intersect(m);
+      expect(hit.volume()).toBeGreaterThan(0.05);
+      hit.delete();
+    }
+    [bin, inlay, placed, overlap, ...slid].forEach((m) => m.delete());
   });
 
   it('floor pockets remove exactly their own volume and stay above the feet', () => {

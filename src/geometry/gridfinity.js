@@ -37,7 +37,15 @@ export const LIP_TIP = 0.6;
 // Vertical section below the lip's inner tip before the 45° support starts.
 export const LIP_SUPPORT_HEIGHT = 1.2;
 
-export const DEFAULT_WALL = 0.95;
+// Walls as thick as the lip is deep: the inner face runs straight up into the lip, so
+// the bin is stiff, a drop-in inlay fits the whole cavity, and the lip needs no support
+// overhang. Gridfinity's own thin wall (0.95) still works for anyone who sets it.
+export const DEFAULT_WALL = LIP_DEPTH;
+
+/** Thickest wall that still leaves the lip opening free for a stacked bin's feet. */
+export function maxWall({ lip }) {
+  return lip ? LIP_DEPTH : Infinity;
+}
 
 const MIN_CORNER_RADIUS = 0.25;
 
@@ -86,9 +94,10 @@ export function buildGridfinityBin(wasm, opts) {
   const { Manifold, CrossSection } = wasm;
   const {
     unitsX, unitsY,
-    wall = DEFAULT_WALL, floor = 1.2,
+    floor = 1.2,
     lip = true, feet = true, segments = 32,
   } = opts;
+  const wall = Math.min(opts.wall ?? DEFAULT_WALL, maxWall({ lip }));
   const heightMm = Math.max(opts.heightMm, minBodyHeight({ feet, floor, wall, lip }));
 
   const garbage = [];
@@ -145,15 +154,15 @@ export function buildGridfinityBin(wasm, opts) {
   const cavity = inset(wall);
   const voids = [];
   if (lip) {
-    const throatDepth = Math.max(LIP_DEPTH, wall);
+    // Thinner walls than the lip depth get a 45° support up to the lip opening.
     const zThroat = heightMm - LIP_SUPPORT_HEIGHT;
-    const zSupport = zThroat - (throatDepth - wall);
-    const throat = inset(throatDepth);
+    const zSupport = zThroat - (LIP_DEPTH - wall);
+    const throat = inset(LIP_DEPTH);
     const lipMid = inset(LIP_DEPTH - LIP_BOTTOM_CHAMFER);
     const zMid = heightMm + LIP_BOTTOM_CHAMFER;
     const zMidTop = zMid + LIP_VERTICAL;
     voids.push(prism(cavity, floorZ, zSupport + 0.01));
-    if (throatDepth > wall) voids.push(loft(cavity, zSupport, throat, zThroat));
+    if (LIP_DEPTH > wall) voids.push(loft(cavity, zSupport, throat, zThroat));
     voids.push(prism(throat, zThroat - 0.01, heightMm + 0.01));
     voids.push(loft(throat, heightMm, lipMid, zMid));
     voids.push(prism(lipMid, zMid - 0.01, zMidTop + 0.01));
