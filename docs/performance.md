@@ -39,6 +39,9 @@ BENCH=1 npx vitest run src/model/planBench.test.js --disableConsoleIntercept
 | 2026-10-25 | overhang per side, free placement | sort 7 units | 89 ms | 3 cases, 46 cells |
 | 2026-10-25 | overhang per side, free placement | sort 21 units | 178 ms | 7 cases, 143 cells |
 | 2026-10-25 | overhang per side, free placement | sort 21 units, overhang per side | 188 ms | 7 cases, 129 cells |
+| 2026-10-25 | layout choices | layout options, Twin Lance pair and drones | 5.9 ms | 2×5 3×4 3×5 |
+| 2026-10-25 | layout choices | layout options, 10 infantry | 2.1 ms | 2×5 3×4 3×5 |
+| 2026-10-25 | layout choices | layout options, mixed case, 15 models | 21 ms | 4×5 5×5 |
 
 Free placement made planning slower, but it stays far below a geometry rebuild and saves grid cells. Measured steps, each kept: checking distances along 90 instead of 360 directions, settling only the best few free spots, and sharing one result between an area and the same area turned took the mixed case from 137 ms to 14 ms and sorting 7 units from 540 ms to 89 ms.
 

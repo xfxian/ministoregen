@@ -2,6 +2,7 @@ import { FormControlLabel, Stack, Switch, ToggleButton, ToggleButtonGroup, Typog
 import { HEIGHT_UNIT, LIP_HEIGHT, LIP_TIP } from '../geometry/gridfinity';
 import { LID_SNAP_DEPTH } from '../geometry/lid';
 import { patchBin, patchLayout } from '../state/updates';
+import LayoutChoices from './LayoutChoices';
 import Stepper from './Stepper';
 
 const LID_HELP = {
@@ -53,6 +54,7 @@ function BinStep({ project, plan, onUpdate }) {
         </Typography>
       </div>
 
+      <LayoutChoices project={project} onChange={set} />
       <Toggle label="Size footprint automatically" checked={bin.autoFootprint} onChange={(v) => set(v ? { autoFootprint: true } : { autoFootprint: false, unitsX: plan.unitsX, unitsY: plan.unitsY })} />
       {!bin.autoFootprint && (
         <Stack direction="row" spacing={1}>

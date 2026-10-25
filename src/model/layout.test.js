@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_WALL, HEIGHT_UNIT, throatSize } from '../geometry/gridfinity';
 import { LID_SNAP_DROP } from '../geometry/lid';
-import { STACKED_FOOT_DROP, layoutStrip, minStripLength, planProject } from './layout';
+import {
+  STACKED_FOOT_DROP, layoutOptions, layoutStrip, minStripLength, planProject,
+} from './layout';
 import { NO_OVERHANG } from './reach';
 import { DEFAULT_LAYOUT, decodeProject, encodeProject, makeDefaultProject, makeGroup, normalizeProject } from './project';
 
@@ -212,5 +214,39 @@ describe('overhang', () => {
     const old = normalizeProject({ version: 2, groups: [{ ...plain, overhang: 15 }] });
     expect(old.version).toBe(3);
     expect(old.groups[0].overhang).toEqual({ front: 15, right: 15, back: 15, left: 15 });
+  });
+});
+
+describe('layoutOptions', () => {
+  const lances = [
+    makeGroup(0, { sizeX: 60, sizeY: 60, count: 1, heightMm: 80, overhang: { front: 10, left: 10 } }),
+    makeGroup(1, { sizeX: 60, sizeY: 60, count: 1, heightMm: 80, overhang: { front: 10, right: 15, back: 20 } }),
+    makeGroup(2, { sizeX: 32, sizeY: 32, count: 2, heightMm: 30 }),
+  ];
+
+  it('starts with the size the planner picks, then other sizes that fit everything', () => {
+    const p = project(lances);
+    const options = layoutOptions(p);
+    const auto = planProject(p);
+    expect(options.length).toBeGreaterThan(1);
+    expect(options.length).toBeLessThanOrEqual(4);
+    expect([options[0].unitsX, options[0].unitsY]).toEqual([auto.unitsX, auto.unitsY]);
+    for (const o of options) {
+      expect(o.plan.warnings.filter((w) => w.severity === 'error')).toEqual([]);
+      expect([o.plan.unitsX, o.plan.unitsY]).toEqual([o.unitsX, o.unitsY]);
+    }
+  });
+
+  it('leaves out the same size turned and sizes far larger than the smallest', () => {
+    const options = layoutOptions(project(lances));
+    const keys = options.map((o) => [o.unitsX, o.unitsY].sort().join('x'));
+    expect(new Set(keys).size).toBe(options.length);
+    const cells = options.map((o) => o.unitsX * o.unitsY);
+    expect(Math.max(...cells)).toBeLessThanOrEqual(1.5 * cells[0] + 1);
+  });
+
+  it('offers nothing when nothing fits or nothing goes in', () => {
+    expect(layoutOptions(project([]))).toEqual([]);
+    expect(layoutOptions(project([makeGroup(0, { sizeX: 150, sizeY: 150, count: 2 })]))).toEqual([]);
   });
 });

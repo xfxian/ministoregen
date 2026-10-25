@@ -4,7 +4,7 @@ import { describe, it } from 'vitest';
 import {
   caseProject, distribute, makeDefaultCollection, makeModel, makeUnit,
 } from './collection';
-import { planProject } from './layout';
+import { layoutOptions, planProject } from './layout';
 import { makeDefaultProject, makeGroup } from './project';
 
 // Every run nudges the first size a little, so no run reuses what an earlier one cached,
@@ -19,19 +19,22 @@ function time(label, run, repeat = 5) {
 
 /** Grid cells × height units of a plan, or summed over the cases of a collection. */
 function size(result) {
+  if (result.text) return result.text;
   if (result.unitsX) return `${result.unitsX}×${result.unitsY}×${result.heightUnits}u`;
   const plans = result.cases.map((c) => planProject(caseProject(result, c)));
   const cells = plans.reduce((n, p) => n + p.unitsX * p.unitsY, 0);
   return `${plans.length} cases, ${cells} cells`;
 }
 
-function plan(groups) {
+function plan(groups, run = planProject) {
   return (i) => {
     const p = makeDefaultProject();
     p.groups = groups.map((g, gi) => (gi === 0 ? { ...g, sizeX: g.sizeX + i * 0.1, sizeY: g.sizeY + i * 0.1 } : g));
-    return planProject(p);
+    return run(p);
   };
 }
+
+const optionSizes = (options) => ({ cases: [], text: options.map((o) => `${o.unitsX}×${o.unitsY}`).join(' ') || 'none' });
 
 const collection = (overhang, i) => ({
   ...makeDefaultCollection(),
@@ -65,6 +68,19 @@ describe.skipIf(!process.env.BENCH)('planning timing', () => {
       makeGroup(2, { sizeX: 32, sizeY: 32, count: 4 }),
       makeGroup(3, { sizeX: 25, sizeY: 25, count: 6 }),
     ]));
+    const lances = [
+      makeGroup(0, { sizeX: 60, sizeY: 60, count: 1, heightMm: 80, overhang: { front: 10, left: 10 } }),
+      makeGroup(1, { sizeX: 60, sizeY: 60, count: 1, heightMm: 80, overhang: { front: 10, right: 15, back: 20 } }),
+      makeGroup(2, { sizeX: 32, sizeY: 32, count: 2, heightMm: 30 }),
+    ];
+    time('layout options, Twin Lance pair and drones', plan(lances, (p) => optionSizes(layoutOptions(p))));
+    time('layout options, 10 infantry', plan([makeGroup(0, { sizeX: 32, sizeY: 32, count: 10 })], (p) => optionSizes(layoutOptions(p))));
+    time('layout options, mixed case (15 models)', plan([
+      makeGroup(0, { sizeX: 60, sizeY: 60, count: 2, heightMm: 80, overhang: { front: 10, right: 15, back: 20 } }),
+      makeGroup(1, { sizeX: 40, sizeY: 40, count: 3, overhang: { left: 8 } }),
+      makeGroup(2, { sizeX: 32, sizeY: 32, count: 4 }),
+      makeGroup(3, { sizeX: 25, sizeY: 25, count: 6 }),
+    ], (p) => optionSizes(layoutOptions(p))));
     time('sort collection, even overhang (7 units)', (i) => distribute(collection({ lance: 15, crisis: 8 }, i)), 3);
     time('sort large collection, even overhang (21 units)', (i) => distribute(tripled(collection({ lance: 15, crisis: 8 }, i))), 1);
     if (process.env.BENCH === 'sides') {
