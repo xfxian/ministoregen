@@ -1,0 +1,59 @@
+{
+  "format": "ministoregen-unit-pack",
+  "version": 1,
+  "name": "Example skirmish pack",
+  "description": "Shows every field of the format. Not tied to any game.",
+  "author": "Your name",
+  "licence": "CC0-1.0",
+  "source": "https://github.com/your-name/your-packs",
+  "units": [
+    {
+      "name": "Rifle squad",
+      "category": "Infantry",
+      "models": [
+        { "name": "Sergeant", "shape": "round", "sizeX": 32, "count": 1, "heightMm": 38 },
+        { "name": "Trooper", "shape": "round", "sizeX": 28.5, "count": 9, "heightMm": 34 }
+      ]
+    },
+    {
+      "name": "Scout riders",
+      "category": "Cavalry",
+      "models": [
+        { "shape": "oval", "sizeX": 35, "sizeY": 60, "count": 3, "heightMm": 50 }
+      ]
+    },
+    {
+      "name": "Winged beast",
+      "category": "Monsters",
+      "models": [
+        {
+          "shape": "round", "sizeX": 60, "count": 1, "heightMm": 90,
+          "overhang": { "front": 10, "right": 35, "back": 15, "left": 35 }
+        }
+      ]
+    },
+    {
+      "name": "Walker with drones",
+      "category": "Vehicles",
+      "models": [
+        { "name": "Walker", "shape": "round", "sizeX": 90, "count": 1, "heightMm": 110 },
+        { "name": "Drone", "shape": "round", "sizeX": 25, "count": 2, "heightMm": 30 }
+      ]
+    },
+    {
+      "name": "Supply truck",
+      "category": "Vehicles",
+      "models": [
+        {
+          "shape": "pads", "sizeX": 70, "sizeY": 120, "count": 1, "heightMm": 60,
+          "pads": [
+            { "x": -25, "y": -40, "sizeX": 12, "sizeY": 20, "shape": "rect" },
+            { "x": 25, "y": -40, "sizeX": 12, "sizeY": 20, "shape": "rect" },
+            { "x": -25, "y": 40, "sizeX": 12, "sizeY": 20, "shape": "rect" },
+            { "x": 25, "y": 40, "sizeX": 12, "sizeY": 20, "shape": "rect" }
+          ]
+        }
+      ]
+    }
+  ]
+}

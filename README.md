@@ -7,6 +7,7 @@ Live at: https://xfxian.github.io/ministoregen
 ## Features
 
 - **My collection**: list the units you own (base shape and size, count, height), then sort them into cases automatically or by dragging; every case sizes its own bin
+- **Unit libraries**: pick units from a built-in library of common base setups, or load a community library for your game by link or file ([format](docs/UNIT_PACKS.md))
 - **Single bin**: skip the collection and design one bin from a list of miniature groups; the bin size, height and pocket layout follow
 - **Gridfinity bins** that stack: spec foot profile, stacking lip and 7 mm height units, built as one watertight solid
 - **Two pocket modes**: a drop-in inlay that passes through the stacking lip, or pockets cut straight into the bin floor
@@ -59,6 +60,10 @@ Pull requests are linted, tested, built and get a preview deployment. Each pull 
 ## Credits
 
 - Gridfinity is a modular storage system by Zack Freedman. Shell dimensions follow the [Gridfinity specification](https://gridfinity.xyz/specification/) as implemented by [gridfinity-rebuilt-openscad](https://github.com/kennetek/gridfinity-rebuilt-openscad) (MIT).
+
+## Disclaimer
+
+ministoregen is unofficial and not affiliated with or endorsed by Games Workshop or any other miniature publisher. Community unit libraries are maintained by their authors; names in them belong to their owners.
 
 ## License
 

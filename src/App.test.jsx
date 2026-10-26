@@ -128,3 +128,39 @@ test('another layout that fits can be picked, and the smallest one again', () =>
   fireEvent.click(within(screen.getByRole('radiogroup', { name: 'Layouts that fit' })).getAllByRole('radio')[0]);
   expect(screen.getByTestId('bin-summary')).toHaveTextContent(auto);
 });
+
+test('a unit can be picked from the built-in library and adjusted before adding', () => {
+  render(<App />);
+  fireEvent.click(screen.getByRole('button', { name: 'Pick from a library' }));
+  const library = screen.getByRole('dialog');
+  expect(within(library).queryByTestId('pack-disclaimer')).not.toBeInTheDocument();
+  fireEvent.change(within(library).getByLabelText('Search'), { target: { value: 'drones' } });
+  fireEvent.click(within(library).getByRole('button', { name: /Vehicle on 60 mm with 2 drones/ }));
+  const dialog = screen.getByRole('dialog');
+  expect(within(dialog).getAllByLabelText('Model').map((f) => f.value)).toEqual(['Vehicle', 'Drone']);
+  fireEvent.change(within(dialog).getAllByLabelText('How many')[1], { target: { value: '3' } });
+  fireEvent.click(within(dialog).getByRole('button', { name: 'Add' }));
+  expect(screen.getByTestId('collection-summary')).toHaveTextContent('4 minis, 4 still need a home');
+});
+
+test('a community library loads from a file, shows the disclaimer and is kept', async () => {
+  render(<App />);
+  fireEvent.click(screen.getByRole('button', { name: 'Pick from a library' }));
+  const pack = JSON.stringify({
+    format: 'ministoregen-unit-pack',
+    version: 1,
+    name: 'Community test pack',
+    licence: 'CC0',
+    units: [{ name: 'Test squad', category: 'Troops', models: [{ shape: 'round', sizeX: 28.5, count: 5 }] }],
+  });
+  const file = new File([pack], 'pack.json', { type: 'application/json' });
+  fireEvent.change(screen.getByTestId('pack-file'), { target: { files: [file] } });
+  expect(await screen.findByText(/Loaded Community test pack: 1 unit\./)).toBeInTheDocument();
+  expect(screen.getByTestId('pack-disclaimer')).toHaveTextContent('not affiliated with or endorsed by Games Workshop');
+  expect(screen.getByText('licence: CC0')).toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: /Test squad/ }));
+  fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Add' }));
+  expect(screen.getByTestId('collection-summary')).toHaveTextContent('5 minis');
+  fireEvent.click(screen.getByRole('button', { name: 'From library' }));
+  expect(within(screen.getByRole('dialog')).getByRole('button', { name: /Test squad/ })).toBeInTheDocument();
+});
