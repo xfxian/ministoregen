@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
-  COLLECTION_VERSION, addCase, addUnit, assignRemaining, assignedCount, caseProject, clampAssignments, distribute, makeCase,
+  COLLECTION_VERSION, addCase, addCollection, addUnit, assignRemaining, assignedCount, caseProject, clampAssignments, distribute, makeCase,
   makeDefaultCollection, makeModel, makeUnit, normalizeCollection, patchUnit, removeUnit, setItemCount, unassigned,
   waitingUnits,
 } from './collection';
@@ -88,6 +88,17 @@ describe('assignments', () => {
     expect(project.groups[1].overhang).toBe(12);
     expect(new Set(project.groups.map((g) => g.id)).size).toBe(3);
     expect(planProject(project).warnings.filter((w) => w.severity === 'error')).toEqual([]);
+  });
+
+  it('adds another collection with new ids, keeping its cases filled', () => {
+    const mine = distribute(collectionWith([makeUnit(0, { name: 'Mine', count: 3 })]));
+    const theirs = distribute(collectionWith([makeUnit(0, { name: 'Theirs', count: 4 })]));
+    const added = addCollection(mine, theirs);
+    expect(added.units.map((u) => u.name)).toEqual(['Mine', 'Theirs']);
+    expect(added.cases).toHaveLength(2);
+    expect(added.units[1].id).not.toBe(theirs.units[0].id);
+    expect(assignedCount(added, added.units[1].id, undefined, added.cases[0].id)).toBe(4);
+    expect(unassigned(added)).toEqual([]);
   });
 
   it('repairs broken stored data', () => {

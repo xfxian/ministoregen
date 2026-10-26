@@ -205,6 +205,35 @@ export function clampAssignments(collection) {
 
 // --- Updates: each returns a function from collection to collection. ---
 
+/**
+ * Adds the units and cases of another collection (from a share link, say) to this one.
+ * Everything gets new ids, so nothing clashes with what is already there.
+ */
+export function addCollection(collection, other) {
+  const ids = new Map();
+  const units = other.units.map((u) => {
+    const id = newId('u');
+    return {
+      ...u,
+      id,
+      models: u.models.map((m) => {
+        const modelId = newId('m');
+        ids.set(lineKey(u.id, m.id), [id, modelId]);
+        return { ...m, id: modelId };
+      }),
+    };
+  });
+  const cases = other.cases.map((c) => ({
+    ...c,
+    id: newId('c'),
+    items: c.items.flatMap((item) => {
+      const target = ids.get(lineKey(item.unitId, item.modelId));
+      return target ? [{ unitId: target[0], modelId: target[1], count: item.count }] : [];
+    }),
+  }));
+  return { ...collection, units: [...collection.units, ...units], cases: [...collection.cases, ...cases] };
+}
+
 export const setCollectionName = (name) => (c) => ({ ...c, name });
 export const setSortMode = (sortMode) => (c) => ({ ...c, sortMode });
 

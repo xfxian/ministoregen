@@ -5,14 +5,18 @@ import {
 } from '@mui/material';
 import { useRef, useState } from 'react';
 import { downloadBlob } from '../export';
-import { deleteDesign, exportLibrary, importLibrary, listDesigns, saveDesign } from '../state/library';
+import {
+  backupFileName, deleteDesign, exportLibrary, importLibrary, listDesigns, saveDesign,
+} from '../state/library';
 
 function summary(project) {
   const minis = project.groups.reduce((n, g) => n + g.count, 0);
   return `${project.groups.length} group${project.groups.length === 1 ? '' : 's'}, ${minis} miniatures`;
 }
 
-function LibraryDialog({ open, onClose, currentId, onOpenDesign, onNewDesign, collection, onImportCollection }) {
+function LibraryDialog({
+  open, onClose, currentId, onOpenDesign, onNewDesign, collection, project, onRestore,
+}) {
   const [designs, setDesigns] = useState(() => listDesigns());
   const [message, setMessage] = useState(null);
   const fileInput = useRef(null);
@@ -20,12 +24,15 @@ function LibraryDialog({ open, onClose, currentId, onOpenDesign, onNewDesign, co
 
   const handleImport = async (file) => {
     try {
-      const { count, collection: imported } = importLibrary(await file.text());
-      const tookCollection = imported ? onImportCollection(imported) : false;
-      setMessage({
-        severity: 'success',
-        text: `Imported ${count} design${count === 1 ? '' : 's'}${tookCollection ? ' and the collection' : ''}.`,
-      });
+      const { count, packs, collection: importedCollection, project: importedProject } = importLibrary(await file.text());
+      const took = onRestore({ collection: importedCollection, project: importedProject });
+      const parts = [
+        took && importedCollection && 'your collection',
+        took && importedProject && 'your single bin',
+        `${count} saved design${count === 1 ? '' : 's'}`,
+        packs > 0 && `${packs} unit librar${packs === 1 ? 'y' : 'ies'}`,
+      ].filter(Boolean);
+      setMessage({ severity: 'success', text: `Restored ${parts.slice(0, -1).join(', ')}${parts.length > 1 ? ' and ' : ''}${parts.at(-1)}.` });
       refresh();
     } catch (e) {
       setMessage({ severity: 'error', text: e.message });
@@ -37,8 +44,8 @@ function LibraryDialog({ open, onClose, currentId, onOpenDesign, onNewDesign, co
       <DialogTitle>Library</DialogTitle>
       <DialogContent dividers>
         <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-          Saved single bins live in this browser, like your collection. A backup file holds both: use it to keep
-          a copy or to move to another device.
+          Everything lives in this browser: your collection, your single bin, saved designs and unit libraries.
+          A backup file holds all of it. Use it to keep a copy, or restore it on another device to carry on there.
         </Typography>
         {message && <Alert severity={message.severity} sx={{ mb: 1 }} onClose={() => setMessage(null)}>{message.text}</Alert>}
         {designs.length === 0 ? (
@@ -74,7 +81,7 @@ function LibraryDialog({ open, onClose, currentId, onOpenDesign, onNewDesign, co
       <DialogActions sx={{ justifyContent: 'space-between', flexWrap: 'wrap' }}>
         <Stack direction="row" spacing={1}>
           <Button startIcon={<FileDownload />}
-            onClick={() => downloadBlob(new Blob([exportLibrary(collection)], { type: 'application/json' }), 'ministoregen-backup.json')}>
+            onClick={() => downloadBlob(new Blob([exportLibrary(collection, project)], { type: 'application/json' }), backupFileName())}>
             Back up
           </Button>
           <Button startIcon={<FileUpload />} onClick={() => fileInput.current?.click()}>Restore</Button>
