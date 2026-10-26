@@ -1,4 +1,4 @@
-import { Add, ContentCopy } from '@mui/icons-material';
+import { Add, ContentCopy, LibraryBooks } from '@mui/icons-material';
 import { Box, Button, ButtonBase, Typography, useMediaQuery } from '@mui/material';
 import { useRef, useState } from 'react';
 import {
@@ -6,12 +6,14 @@ import {
   setSortMode, unassigned, unitTotal,
 } from '../../model/collection';
 import { isDefaultProject } from '../../model/project';
+import { unitFromPack } from '../../model/unitPacks';
 import { gridPaper, overline, tokens } from '../../theme';
 import CaseCard, { useUnitDrop } from './CaseCard';
 import CaseDetail from './CaseDetail';
 import Shelf from './Shelf';
 import UnitCard from './UnitCard';
 import UnitDialog from './UnitDialog';
+import UnitPackDialog from './UnitPackDialog';
 
 function NewCaseCard({ onCreate, onDropUnit }) {
   const { over, handlers } = useUnitDrop(onDropUnit);
@@ -34,7 +36,7 @@ function NewCaseCard({ onCreate, onDropUnit }) {
   );
 }
 
-function EmptyCollection({ onAdd, onImportSingle, singleGroups, onSwitchToSingle }) {
+function EmptyCollection({ onAdd, onAddFromLibrary, onImportSingle, singleGroups, onSwitchToSingle }) {
   return (
     <Box sx={{ maxWidth: 640, mx: 'auto', my: { xs: 4, md: 10 }, px: 2, display: 'flex', flexDirection: 'column', gap: 2 }}>
       <Typography sx={overline}>Collection</Typography>
@@ -47,6 +49,7 @@ function EmptyCollection({ onAdd, onImportSingle, singleGroups, onSwitchToSingle
       </Typography>
       <Box sx={{ display: 'flex', gap: 1.5, flexWrap: 'wrap', mt: 1 }}>
         <Button variant="contained" size="large" startIcon={<Add />} onClick={onAdd}>Add your first unit</Button>
+        <Button variant="outlined" size="large" startIcon={<LibraryBooks />} onClick={onAddFromLibrary}>Pick from a library</Button>
         {singleGroups > 0 && (
           <Button variant="outlined" size="large" startIcon={<ContentCopy />} onClick={onImportSingle}>
             Copy {singleGroups} group{singleGroups === 1 ? '' : 's'} from my single bin
@@ -70,6 +73,7 @@ function CollectionView({
   singleProject, onSwitchToSingle, onToast,
 }) {
   const [dialog, setDialog] = useState(null); // { unit, isNew }
+  const [packsOpen, setPacksOpen] = useState(false);
   const detailRef = useRef(null);
   const stacked = useMediaQuery('(max-width: 899.95px)');
   const selected = cases.find((c) => c.caseItem.id === selectedId) ?? cases[0];
@@ -121,11 +125,19 @@ function CollectionView({
     ));
   };
 
+  const packDialog = packsOpen && (
+    <UnitPackDialog
+      onPick={(entry) => { setPacksOpen(false); setDialog({ unit: unitFromPack(entry, modelCount), isNew: true }); }}
+      onClose={() => setPacksOpen(false)}
+    />
+  );
+
   if (!collection.units.length && !collection.cases.length) {
     return (
       <Box sx={{ height: '100%', overflowY: 'auto', ...gridPaper }}>
         <EmptyCollection
           onAdd={() => setDialog({ unit: makeUnit(0), isNew: true })}
+          onAddFromLibrary={() => setPacksOpen(true)}
           onImportSingle={importSingle}
           singleGroups={isDefaultProject(singleProject) ? 0 : singleProject.groups.length}
           onSwitchToSingle={onSwitchToSingle}
@@ -139,6 +151,7 @@ function CollectionView({
             onClose={() => setDialog(null)}
           />
         )}
+        {packDialog}
       </Box>
     );
   }
@@ -155,7 +168,10 @@ function CollectionView({
                 : `${total} minis in ${collection.cases.length} case${collection.cases.length === 1 ? '' : 's'}`}
             </Typography>
           </Box>
-          <Button variant="outlined" startIcon={<Add />} onClick={() => setDialog({ unit: makeUnit(modelCount), isNew: true })}>Add unit</Button>
+          <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+            <Button variant="outlined" startIcon={<LibraryBooks />} onClick={() => setPacksOpen(true)}>From library</Button>
+            <Button variant="outlined" startIcon={<Add />} onClick={() => setDialog({ unit: makeUnit(modelCount), isNew: true })}>Add unit</Button>
+          </Box>
         </Box>
 
         <Box component="section" aria-label="Units" sx={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 160px), 1fr))', gap: 1.5 }}>
@@ -237,6 +253,7 @@ function CollectionView({
           onClose={() => setDialog(null)}
         />
       )}
+      {packDialog}
     </Box>
   );
 }
