@@ -1,6 +1,9 @@
-import { fireEvent, render, screen, within } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { beforeEach, vi } from 'vitest';
 import App from './App';
+import { addUnit as withUnit, makeDefaultCollection, makeUnit } from './model/collection';
+import { makeDefaultProject } from './model/project';
+import { collectionLink } from './state/shareLink';
 import { versionInfo } from './version';
 
 vi.mock('./components/Viewport', () => ({ default: () => null }));
@@ -163,4 +166,45 @@ test('a community library loads from a file, shows the disclaimer and is kept', 
   expect(screen.getByTestId('collection-summary')).toHaveTextContent('5 minis');
   fireEvent.click(screen.getByRole('button', { name: 'From library' }));
   expect(within(screen.getByRole('dialog')).getByRole('button', { name: /Test squad/ })).toBeInTheDocument();
+});
+
+test('a shared collection opens only after asking, and can be added to your own', async () => {
+  const sharedValue = withUnit(makeUnit(0, { name: 'Friend squad', count: 3 }))({ ...makeDefaultCollection(), name: 'Friend army' });
+  render(<App shared={{ kind: 'collection', value: sharedValue }} />);
+  let dialog = screen.getByRole('dialog', { name: 'Open a shared collection' });
+  expect(dialog).toHaveTextContent('Friend army: 1 unit, 3 minis in 0 cases.');
+  fireEvent.click(within(dialog).getByRole('button', { name: 'Cancel' }));
+  expect(screen.getByText('List what you own. The cases follow.')).toBeInTheDocument();
+  cleanup();
+
+  render(<App shared={{ kind: 'collection', value: sharedValue }} />);
+  fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Open' }));
+  expect(screen.getByTestId('collection-summary')).toHaveTextContent('3 minis, 3 still need a home');
+  await new Promise((resolve) => { setTimeout(resolve, 400); }); // let it reach storage
+  cleanup();
+
+  render(<App shared={{ kind: 'collection', value: sharedValue }} />);
+  dialog = screen.getByRole('dialog');
+  expect(dialog).toHaveTextContent('You already have a collection');
+  fireEvent.click(within(dialog).getByRole('button', { name: 'Add to mine' }));
+  expect(screen.getByTestId('collection-summary')).toHaveTextContent('6 minis, 6 still need a home');
+});
+
+test('a shared single bin opens in single-bin mode', () => {
+  render(<App shared={{ kind: 'bin', value: { ...makeDefaultProject(), name: 'Shared tray' } }} />);
+  expect(screen.getByDisplayValue('Shared tray')).toBeInTheDocument();
+});
+
+test('a broken link says so', () => {
+  render(<App shared={{ error: 'This link is damaged or incomplete. Ask for a new one.' }} />);
+  expect(screen.getByText(/This link is damaged/)).toBeInTheDocument();
+});
+
+test('a link pasted into an open tab is picked up', async () => {
+  render(<App />);
+  const link = await collectionLink(withUnit(makeUnit(0, { name: 'Pasted', count: 2 }))({ ...makeDefaultCollection(), name: 'Pasted army' }));
+  window.history.replaceState(null, '', new URL(link).hash);
+  window.dispatchEvent(new HashChangeEvent('hashchange'));
+  expect(await screen.findByRole('dialog', { name: 'Open a shared collection' })).toHaveTextContent('Pasted army');
+  expect(window.location.hash).toBe('');
 });

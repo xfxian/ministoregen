@@ -15,8 +15,8 @@ Live at: https://xfxian.github.io/ministoregen
 - **Lids**: flat, or stackable with a baseplate grid on top; optional snap clips keep either one on
 - **Fit check** with warnings and one-click fixes (too tall, does not fit, base wider than the bin)
 - **Plan, 3D and cut-away views**, with optional stand-ins for the miniatures
-- **Library** of saved designs in the browser; one backup file holds the designs and the collection
-- **Share link** that carries the whole design; undo and redo
+- **Library** of saved designs in the browser; one backup file holds everything (collection, single bin, designs, unit libraries) to move to another device
+- **Share links** for the whole collection or one bin, compressed to stay short (see [docs/SHARE_LINKS.md](docs/SHARE_LINKS.md)); undo and redo
 - **STL export** for the bin and the inlay, or every case at once as a zip
 
 ## Tech stack

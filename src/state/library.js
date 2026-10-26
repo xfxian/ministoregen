@@ -1,5 +1,7 @@
 import { normalizeCollection } from '../model/collection';
 import { normalizeProject } from '../model/project';
+import { parseUnitPack } from '../model/unitPacks';
+import { listUnitPacks, saveUnitPack } from './unitPacks';
 
 /**
  * Local design library: saved projects live in the browser's local storage.
@@ -44,14 +46,30 @@ export function deleteDesign(id) {
   write(read().filter((e) => e.id !== id));
 }
 
-/** Backup file with all saved single-bin designs and, when given, the collection. */
-export function exportLibrary(collection) {
-  return JSON.stringify({ format: LIBRARY_FILE_FORMAT, version: 1, designs: read(), collection }, null, 2);
+// 2: also holds the open single bin and the loaded unit libraries.
+const LIBRARY_FILE_VERSION = 2;
+
+/**
+ * Backup file with everything this browser keeps: saved single-bin designs, loaded unit
+ * libraries and, when given, the collection and the open single bin.
+ */
+export function exportLibrary(collection, project) {
+  const unitPacks = listUnitPacks().map(({ url, pack }) => ({ url, pack }));
+  return JSON.stringify({
+    format: LIBRARY_FILE_FORMAT, version: LIBRARY_FILE_VERSION, designs: read(), unitPacks, collection, project,
+  }, null, 2);
+}
+
+/** File name for a backup made on `date`, such as ministoregen-backup-2026-10-26.json. */
+export function backupFileName(date = new Date()) {
+  const pad = (n) => String(n).padStart(2, '0');
+  return `ministoregen-backup-${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}.json`;
 }
 
 /**
- * Merges designs from an exported file. Returns how many designs were added or
- * updated, and the file's collection (or null) for the caller to adopt.
+ * Merges designs and unit libraries from an exported file. Returns how many designs
+ * and libraries were added or updated, and the file's collection and single bin (or
+ * null) for the caller to adopt.
  */
 export function importLibrary(text) {
   const data = JSON.parse(text);
@@ -68,5 +86,19 @@ export function importLibrary(text) {
     count++;
   }
   write(entries);
-  return { count, collection: data.collection ? normalizeCollection(data.collection) : null };
+  let packs = 0;
+  for (const entry of Array.isArray(data.unitPacks) ? data.unitPacks : []) {
+    try {
+      saveUnitPack(parseUnitPack(entry?.pack), typeof entry?.url === 'string' ? entry.url : '');
+      packs++;
+    } catch {
+      // A library that no longer reads is skipped; the rest of the backup still counts.
+    }
+  }
+  return {
+    count,
+    packs,
+    collection: data.collection ? normalizeCollection(data.collection) : null,
+    project: data.project ? normalizeProject(data.project) : null,
+  };
 }

@@ -7,10 +7,12 @@ import '@fontsource/jetbrains-mono/400.css';
 import '@fontsource/jetbrains-mono/700.css';
 import './index.css';
 import App from './App';
+import { readShareLink } from './state/shareLink';
 
 const root = ReactDOM.createRoot(document.getElementById('root'));
-root.render(
+// Share links are compressed, and unpacking them takes a moment before the first render.
+readShareLink(window.location.hash).then((shared) => root.render(
   <React.StrictMode>
-    <App />
+    <App shared={shared} />
   </React.StrictMode>
-);
+));
